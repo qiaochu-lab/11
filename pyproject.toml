@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pxdesign-train"
+version = "0.0.1"
+description = "Unofficial training code for PXDesign-d, the diffusion generator from ByteDance Protenix's PXDesign suite. Reconstructed from the technical report; not a release from ByteDance."
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.1",
+    "numpy",
+]
+
+[tool.setuptools.packages.find]
+include = ["pxdesign_train*"]

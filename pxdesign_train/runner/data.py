@@ -1,0 +1,220 @@
+"""
+Per-item design featurization layer for training datasets.
+
+`DesignSourceDataset` wraps an underlying "complex provider" (anything indexable
+that returns a real protein complex) with the PXDesign-specific transformations:
+
+    provider[i] -> (atom_array, token_array, feature_dict, label_dict)
+              |
+              v
+    crop to crop_size (binder kept whole)
+              |
+              v
+    design-featurize (mark binder as xpb, build conditional_templ, hotspot, etc.)
+              |
+              v
+    return {input_feature_dict, label_dict, binder_token_mask, source_name}
+
+Providers are *up to the caller*. For Protenix's `BaseSingleDataset` you'd
+write a small `ProtenixProviderAdapter` that extracts the four objects from
+its returned dict. For an AFDB monomer reader you'd write a different
+adapter. The trainer doesn't care which.
+
+Each provider also needs to tell the cropper which residues are the binder:
+  - For PPI complexes: usually a designated chain (`binder_chain_id`).
+  - For monomers in the distillation pool: the *whole monomer* is the binder.
+The provider returns this via `binder_selector(atom_array)` — a callable that
+takes the AtomArray and returns either a chain_id string or a per-atom mask.
+
+This keeps each source's binder-selection policy at the source layer, not
+the featurizer layer.
+"""
+from dataclasses import dataclass, field
+from typing import Any, Callable, Optional, Protocol, Union
+
+import numpy as np
+import torch
+from torch.utils.data import Dataset
+
+from pxdesign_train.data.cropper import DesignCropper
+from pxdesign_train.data.featurizer import DesignFeaturizer, DesignSelection
+
+
+BinderSelector = Callable[[Any], Union[str, np.ndarray]]
+
+
+class ComplexProvider(Protocol):
+    """Minimum interface the trainer needs from each data source.
+
+    Implementers return one *uncropped, unfeaturized* protein complex per
+    index, plus a hint about which residues should be treated as the binder.
+
+    Real-data providers (Protenix `BaseSingleDataset`, an AFDB shard reader,
+    etc.) wrap their native data format with this interface. Tests can use
+    trivial in-memory providers.
+    """
+
+    def __len__(self) -> int: ...
+
+    def __getitem__(self, idx: int) -> tuple[
+        Any,                       # biotite AtomArray (Protenix-annotated)
+        Any,                       # protenix TokenArray
+        dict[str, torch.Tensor],   # base feature_dict (Protenix-style)
+        dict[str, torch.Tensor],   # base label_dict (coordinate + coordinate_mask)
+        BinderSelector,            # how to pick the binder on this complex
+    ]: ...
+
+
+@dataclass
+class DesignSourceDataset(Dataset):
+    """Adapter from a `ComplexProvider` to a featurized training-ready dataset.
+
+    Args:
+        provider: the underlying complex provider.
+        source_name: tag used by the trainer for logging / curriculum sampling.
+        crop_size: token budget for `DesignCropper`. Per the report this is 640.
+        hotspot_radius / hotspot_max_frac / hotspot_force_zero_prob: forwarded
+            to `DesignSelection`. See `featurizer.py` for semantics.
+        seed: base seed; combined with index per call to keep the RNG
+            deterministic for a given (epoch, index) without per-epoch state.
+    """
+
+    provider: ComplexProvider
+    source_name: str
+    crop_size: int = 640
+    hotspot_radius: float = 8.0
+    hotspot_max_frac: float = 0.5
+    hotspot_force_zero_prob: float = 0.2
+    seed: int = 0
+    _cropper: DesignCropper = field(init=False)
+
+    def __post_init__(self) -> None:
+        self._cropper = DesignCropper(crop_size=self.crop_size)
+
+    def __len__(self) -> int:
+        return len(self.provider)
+
+    def __getitem__(self, idx: int) -> dict[str, Any]:
+        atom_array, token_array, feat, label, binder_selector = self.provider[idx]
+
+        # Resolve the binder selector into something the cropper accepts.
+        sel = binder_selector(atom_array)
+        if isinstance(sel, str):
+            crop = self._cropper.crop(atom_array, token_array, binder_chain_id=sel)
+        else:
+            crop = self._cropper.crop(atom_array, token_array, binder_atom_mask=sel)
+
+        # Slice base feature_dict and label_dict to the kept tokens / atoms.
+        feat = _slice_feature_dict(feat, atom_array, token_array, crop)
+        label = _slice_label_dict(label, atom_array, crop)
+
+        # Apply design featurization on the cropped complex.
+        rng = np.random.default_rng((self.seed + idx) % (2**32))
+        selection = DesignSelection(
+            binder_atom_mask=crop.binder_atom_mask,
+            hotspot_radius=self.hotspot_radius,
+            hotspot_max_frac=self.hotspot_max_frac,
+            hotspot_force_zero_prob=self.hotspot_force_zero_prob,
+            rng=rng,
+        )
+        new_feat, new_label, new_aa = DesignFeaturizer(selection).transform(
+            crop.atom_array, feat, label,
+        )
+
+        return {
+            "input_feature_dict": new_feat,
+            "label_dict": new_label,
+            "binder_token_mask": torch.from_numpy(crop.binder_token_mask),
+            "source_name": self.source_name,
+        }
+
+
+def _slice_feature_dict(
+    feat: dict[str, torch.Tensor],
+    orig_atom_array,
+    orig_token_array,
+    crop,
+) -> dict[str, torch.Tensor]:
+    """Cut Protenix-style per-token / per-atom feature tensors to the crop.
+
+    We need this because the provider's feature_dict was computed on the
+    UNCROPPED arrays; after cropping the tensor sizes don't match. We compare
+    by length to decide which axis to slice.
+
+    A provider that featurizes *after* cropping (e.g. a future Protenix
+    pipeline that runs the featurizer on the cropped arrays) can bypass this
+    and pass `feature_dict={}` — the design featurizer will re-derive what it
+    needs from the cropped AtomArray.
+    """
+    n_token_orig = len(orig_token_array)
+    n_atom_orig = len(orig_atom_array)
+    n_token_new = len(crop.token_array)
+    n_atom_new = len(crop.atom_array)
+
+    # Build token-index and atom-index masks from the cropped data.
+    # The cropper kept tokens by global token index; for atoms it kept those
+    # tokens' atoms. We rederive selection masks by matching residue (chain_id,
+    # res_id) keys — robust to any reordering inside `select_by_token_indices`.
+    kept_token_keys = set(
+        (cid, rid) for cid, rid in zip(
+            crop.atom_array.chain_id[crop.atom_array.distogram_rep_atom_mask.astype(bool)],
+            crop.atom_array.res_id[crop.atom_array.distogram_rep_atom_mask.astype(bool)],
+        )
+    )
+    orig_rep_mask = orig_atom_array.distogram_rep_atom_mask.astype(bool)
+    orig_token_keys = list(zip(
+        orig_atom_array.chain_id[orig_rep_mask],
+        orig_atom_array.res_id[orig_rep_mask],
+    ))
+    token_keep_mask = np.array([k in kept_token_keys for k in orig_token_keys])
+
+    atom_keep_mask = np.array([
+        (cid, rid) in kept_token_keys
+        for cid, rid in zip(orig_atom_array.chain_id, orig_atom_array.res_id)
+    ])
+
+    sliced: dict[str, torch.Tensor] = {}
+    for k, v in feat.items():
+        if not isinstance(v, torch.Tensor):
+            sliced[k] = v
+            continue
+        if v.dim() == 0:
+            sliced[k] = v
+            continue
+        # Try to match an axis by length.
+        if v.shape[0] == n_token_orig:
+            v = v[token_keep_mask]
+        elif v.shape[0] == n_atom_orig:
+            v = v[atom_keep_mask]
+        elif v.dim() >= 2 and v.shape[1] == n_token_orig:
+            # e.g. msa [N_msa, N_token]
+            v = v[:, token_keep_mask]
+        # Else leave unchanged (could be a scalar / pair / extra dim that
+        # the design featurizer either doesn't use or recomputes).
+        sliced[k] = v
+    return sliced
+
+
+def _slice_label_dict(label, orig_atom_array, crop) -> dict[str, torch.Tensor]:
+    n_atom_orig = len(orig_atom_array)
+    kept_token_keys = set(
+        (cid, rid) for cid, rid in zip(
+            crop.atom_array.chain_id[crop.atom_array.distogram_rep_atom_mask.astype(bool)],
+            crop.atom_array.res_id[crop.atom_array.distogram_rep_atom_mask.astype(bool)],
+        )
+    )
+    atom_keep_mask = np.array([
+        (cid, rid) in kept_token_keys
+        for cid, rid in zip(orig_atom_array.chain_id, orig_atom_array.res_id)
+    ])
+
+    sliced = {}
+    for k, v in label.items():
+        if not isinstance(v, torch.Tensor):
+            sliced[k] = v
+            continue
+        if v.dim() >= 1 and v.shape[0] == n_atom_orig:
+            sliced[k] = v[atom_keep_mask]
+        else:
+            sliced[k] = v
+    return sliced

@@ -109,9 +109,12 @@ def test_unmask_counts_sum_to_n():
 
 # ---------- input_source switch (A: s_inputs vs B: diffusion_internal) ----------
 
-def test_config_default_input_source_is_s_inputs():
+def test_config_default_input_source_is_diffusion_internal():
+    # Decision (author-confirmed): B (structure-aware a_token) is the default;
+    # s_inputs is a baseline/ablation only.
     from pxdesign_train.configs.configs_train import training_configs
-    assert training_configs["residue_type"]["input_source"] == "s_inputs"
+    assert training_configs["residue_type"]["input_source"] == "diffusion_internal"
+    assert training_configs["residue_type"]["trunk_grad_scale"] == 1.0
 
 
 def test_head_builds_and_runs_at_both_input_dims():

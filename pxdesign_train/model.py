@@ -11,6 +11,7 @@ is also enabled here — see `heads.DesignDistogramHead`. The diffusion-token
 variant (`design_diffusion_distogram`, c_z=768) needs a DiffusionModule hook
 to surface per-step token embeddings; that wiring is deferred (see heads.py).
 """
+import logging
 from typing import Any, Optional
 
 import torch
@@ -73,18 +74,34 @@ class ProtenixDesignTrain(ProtenixDesign):
         if self.enable_residue_type_head:
             res_cfg = getattr(configs, "residue_type", None)
             vocab_size = getattr(res_cfg, "vocab_size", 20) if res_cfg is not None else 20
-            # The AA head reads `s_inputs` (the real per-token conditioning
-            # embedding). PXDesign's `s_trunk`/`s` is a zero placeholder, so we
-            # size the head to c_s_inputs (449), NOT c_s (384).
-            c_in = getattr(configs, "c_s_inputs", None)
-            if c_in is None:
-                c_in = getattr(getattr(configs, "model", object()), "c_s_inputs", 449)
             use_time = bool(getattr(res_cfg, "use_time_embedding", True)) if res_cfg is not None else True
-            self.design_residue_type_head = DesignResidueTypeHead(
-                c_s=c_in,
-                no_bins=vocab_size,
-                use_time=use_time,
+            # input_source selects which per-token representation the AA head reads:
+            #   "s_inputs"          — outer conditioning embedding (449), structure-blind, sigma-free (default)
+            #   "diffusion_internal"— a_token captured from DiffusionModule.layernorm_a
+            #                         (c_token), structure- and sigma-aware (spike)
+            self.aa_input_source = (
+                getattr(res_cfg, "input_source", "s_inputs") if res_cfg is not None else "s_inputs"
             )
+            if self.aa_input_source == "diffusion_internal":
+                # a_token dim = the DiffusionModule's own c_token (read from the
+                # live module — it differs from the global c_token=384).
+                c_in = getattr(self.diffusion_module, "c_token", None) or getattr(
+                    configs, "c_token", 768
+                )
+            else:
+                c_in = getattr(configs, "c_s_inputs", None)
+                if c_in is None:
+                    c_in = getattr(getattr(configs, "model", object()), "c_s_inputs", 449)
+            self.design_residue_type_head = DesignResidueTypeHead(
+                c_s=c_in, no_bins=vocab_size, use_time=use_time,
+            )
+            # Spike: capture the internal per-token representation via a forward
+            # hook — NO edit to the Protenix/PXDesign submodule source.
+            self._a_token_cache = None
+            if self.aa_input_source == "diffusion_internal":
+                def _capture_a_token(_module, _inp, out):
+                    self._a_token_cache = out
+                self.diffusion_module.layernorm_a.register_forward_hook(_capture_a_token)
 
     def _train_forward(
         self,
@@ -139,11 +156,19 @@ class ProtenixDesignTrain(ProtenixDesign):
         if self.enable_distogram_head:
             out["distogram_logits"] = self.design_distogram_head(z)
         if self.enable_residue_type_head:
-            # Read s_inputs (NOT the zero s_trunk), conditioned on the discrete
-            # masked-diffusion time aa_t when present.
-            out["aa_logits"] = self.design_residue_type_head(
-                s_inputs, aa_t=input_feature_dict.get("aa_t")
-            )
+            aa_t = input_feature_dict.get("aa_t")
+            token_repr = s_inputs
+            if self.aa_input_source == "diffusion_internal":
+                a = self._a_token_cache  # [..., N_sample, N_token, c_token]
+                if a is None:
+                    # Hook never fired (e.g. checkpointing edge case) — fall back.
+                    logging.getLogger(__name__).warning(
+                        "diffusion_internal: a_token not captured; falling back to s_inputs"
+                    )
+                else:
+                    token_repr = a.mean(dim=-3).to(s_inputs.dtype)  # mean-reduce N_sample
+                    out["a_token_shape"] = torch.tensor(list(a.shape))
+            out["aa_logits"] = self.design_residue_type_head(token_repr, aa_t=aa_t)
 
         return out
 
@@ -158,6 +183,11 @@ class ProtenixDesignTrain(ProtenixDesign):
         ``aa_logits`` of shape ``[..., N_token, no_bins]``.
         """
         assert self.enable_residue_type_head, "residue_type head is not enabled"
+        if getattr(self, "aa_input_source", "s_inputs") == "diffusion_internal":
+            raise NotImplementedError(
+                "predict_aa (AA-only sampler path) requires input_source='s_inputs'; "
+                "diffusion_internal needs a coordinate forward to populate a_token."
+            )
         input_feature_dict = self.diffusion_module.diffusion_conditioning.relpe.generate_relp(
             input_feature_dict
         )

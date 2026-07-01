@@ -30,6 +30,9 @@ training_configs["residue_type"] = {
     "mask_max_prob": 1.0,
     # V3: feed the discrete masked-diffusion time aa_t into the AA head.
     "use_time_embedding": True,
+    # Representation the AA head reads: "s_inputs" (default, structure-blind) or
+    # "diffusion_internal" (a_token from DiffusionModule.layernorm_a, spike).
+    "input_source": "s_inputs",
 }
 
 # EDM training noise sampler.

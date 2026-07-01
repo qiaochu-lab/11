@@ -64,6 +64,11 @@ def main():
     parser.add_argument("--sample", action="store_true",
                         help="After training, run the iterative-unmask AA sampler on one batch")
     parser.add_argument("--sample_steps", type=int, default=8)
+    parser.add_argument("--aa_input_source", default="s_inputs",
+                        choices=["s_inputs", "diffusion_internal"],
+                        help="Representation the AA head reads (spike)")
+    parser.add_argument("--grad_probe", action="store_true",
+                        help="One forward+backward, report a_token capture / shapes / grads")
     args = parser.parse_args()
 
     device = torch.device(args.device)
@@ -107,6 +112,7 @@ def main():
     from pxdesign_train.configs.configs_train import training_configs
 
     configs = parse_configs(training_configs, arg_str="")
+    configs.residue_type.input_source = args.aa_input_source
     configs.residue_type.mask_mode = args.aa_mask_mode
     configs.residue_type.mask_prob = args.aa_mask_prob
     configs.residue_type.mask_min_prob = args.aa_mask_min_prob
@@ -135,6 +141,33 @@ def main():
     )
     print(f"Model init: {time.time() - t1:.1f}s "
           f"({sum(p.numel() for p in trainer.model.parameters())/1e6:.1f}M params)")
+
+    # ---- grad probe (spike): one forward+backward, inspect capture/shapes/grads ----
+    if args.grad_probe:
+        print(f"\n{'-'*60}\nGrad probe (input_source={args.aa_input_source})...")
+        import math as _math
+        rm = trainer.raw_model
+        rm.train()
+        rm.zero_grad(set_to_none=True)
+        batch = next(iter(trainer.train_dl))
+        loss_out = trainer.forward_loss(batch)
+        loss_out["loss"].backward()
+        cache = getattr(rm, "_a_token_cache", None)
+        head = rm.design_residue_type_head
+        hgs = [p.grad for p in head.parameters() if p.grad is not None]
+        head_gnorm = float(torch.sqrt(sum((g.float()**2).sum() for g in hgs))) if hgs else 0.0
+        head_finite = all(torch.isfinite(g).all() for g in hgs)
+        # does grad reach the trunk (diffusion_module)?
+        trunk_grads = [p.grad for p in rm.diffusion_module.parameters() if p.grad is not None]
+        trunk_reached = len(trunk_grads) > 0
+        print(f"  a_token captured: {cache is not None}"
+              + (f", shape={tuple(cache.shape)}" if cache is not None else ""))
+        print(f"  aa_ce={float(loss_out['aa_ce']):.4f}  aa_acc={float(loss_out['aa_acc']):.3f}"
+              f"  loss_finite={bool(torch.isfinite(loss_out['loss']))}")
+        print(f"  AA head grad: nonzero={head_gnorm>0} norm={head_gnorm:.4g} finite={head_finite}")
+        print(f"  grad reaches diffusion_module trunk: {trunk_reached}")
+        print("GRAD PROBE OK")
+        rm.zero_grad(set_to_none=True)
 
     # ---- run ----
     print(f"\nRunning {args.n_steps} training step(s)...")

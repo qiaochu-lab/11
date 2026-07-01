@@ -1,4 +1,4 @@
-# ProteoAA
+# Backbone moduel
 
 **Sequence–structure co-design by adding a residue-type masked discrete diffusion
 on top of PXDesign-d.**

@@ -39,6 +39,8 @@ def build(args, device):
 
     configs = parse_configs(training_configs, arg_str="")
     configs.residue_type.input_source = args.aa_input_source
+    configs.residue_type.trunk_grad_scale = args.trunk_grad_scale
+    configs.residue_type.internal_reduce = args.internal_reduce
     configs.residue_type.mask_mode = "time_dependent"
     configs.residue_type.mask_min_prob = 0.15
     configs.dtype = args.dtype
@@ -132,6 +134,8 @@ def main():
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--aa_input_source", default="s_inputs",
                     choices=["s_inputs", "diffusion_internal"])
+    ap.add_argument("--trunk_grad_scale", type=float, default=1.0)
+    ap.add_argument("--internal_reduce", default="mean", choices=["mean", "low_sigma"])
     ap.add_argument("--out", default="mini_experiment.json")
     args = ap.parse_args()
     device = torch.device(args.device)

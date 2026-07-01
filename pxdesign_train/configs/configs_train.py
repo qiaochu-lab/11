@@ -33,6 +33,9 @@ training_configs["residue_type"] = {
     # Representation the AA head reads: "s_inputs" (default, structure-blind) or
     # "diffusion_internal" (a_token from DiffusionModule.layernorm_a, spike).
     "input_source": "s_inputs",
+    # diffusion_internal hardening (only used when input_source="diffusion_internal"):
+    "trunk_grad_scale": 1.0,     # scale AA grad into coord trunk (0=stop-grad→protect coords)
+    "internal_reduce": "mean",   # "mean" | "low_sigma" (pick least-noisy sample)
 }
 
 # EDM training noise sampler.

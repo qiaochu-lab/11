@@ -134,6 +134,28 @@ def test_a_token_nsample_mean_reduce_contract():
     assert torch.allclose(reduced, a.mean(0))
 
 
+def test_trunk_grad_scale_detach_mix():
+    # Forward value is identical for any scale; gradient into the trunk is g*upstream.
+    x = torch.randn(3, 4)
+    for g in (0.0, 0.25, 1.0):
+        xg = x.clone().requires_grad_(True)
+        y = g * xg + (1.0 - g) * xg.detach()
+        assert torch.allclose(y, xg)                       # forward unchanged
+        y.sum().backward()
+        assert torch.allclose(xg.grad, torch.full_like(xg, g))  # grad scaled by g
+
+
+def test_low_sigma_reduce_picks_min_sigma_sample():
+    # a: [N_sample, N_token, c]; sigma: [N_sample] -> pick least-noisy sample.
+    a = torch.randn(4, 5, 8)
+    sigma = torch.tensor([0.9, 0.1, 0.5, 0.7])
+    idx = sigma.argmin(dim=-1)
+    idx_e = idx[..., None, None, None].expand(*idx.shape, 1, a.shape[-2], a.shape[-1])
+    picked = a.gather(dim=-3, index=idx_e).squeeze(-3)
+    assert picked.shape == (5, 8)
+    assert torch.allclose(picked, a[1])                    # sigma min at index 1
+
+
 def test_iterative_unmask_fills_all_positions():
     torch.manual_seed(0)
     n_token = 12

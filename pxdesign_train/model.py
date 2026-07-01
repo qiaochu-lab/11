@@ -82,6 +82,17 @@ class ProtenixDesignTrain(ProtenixDesign):
             self.aa_input_source = (
                 getattr(res_cfg, "input_source", "s_inputs") if res_cfg is not None else "s_inputs"
             )
+            # diffusion_internal hardening knobs:
+            #   trunk_grad_scale: scale AA-loss gradient flowing into the coord
+            #     trunk (1.0 = full, 0.0 = stop-grad → coords untouched by AA).
+            #   internal_reduce: how to collapse the N_sample axis of a_token
+            #     ("mean" or "low_sigma" = pick the least-noisy sample).
+            self.aa_trunk_grad_scale = (
+                float(getattr(res_cfg, "trunk_grad_scale", 1.0)) if res_cfg is not None else 1.0
+            )
+            self.aa_internal_reduce = (
+                getattr(res_cfg, "internal_reduce", "mean") if res_cfg is not None else "mean"
+            )
             if self.aa_input_source == "diffusion_internal":
                 # a_token dim = the DiffusionModule's own c_token (read from the
                 # live module — it differs from the global c_token=384).
@@ -102,6 +113,19 @@ class ProtenixDesignTrain(ProtenixDesign):
                 def _capture_a_token(_module, _inp, out):
                     self._a_token_cache = out
                 self.diffusion_module.layernorm_a.register_forward_hook(_capture_a_token)
+
+    def _reduce_a_token(self, a: torch.Tensor, sigma: Optional[torch.Tensor]) -> torch.Tensor:
+        """Collapse a_token's N_sample axis (dim -3).
+
+        a: [..., N_sample, N_token, c_token]; sigma: [..., N_sample].
+        "mean" averages all noise draws; "low_sigma" picks the least-noisy
+        (smallest-sigma) draw, giving a cleaner, less sigma-mixed signal.
+        """
+        if self.aa_internal_reduce == "low_sigma" and sigma is not None:
+            idx = sigma.argmin(dim=-1)  # [...]
+            idx_e = idx[..., None, None, None].expand(*idx.shape, 1, a.shape[-2], a.shape[-1])
+            return a.gather(dim=-3, index=idx_e).squeeze(-3)
+        return a.mean(dim=-3)
 
     def _train_forward(
         self,
@@ -166,7 +190,12 @@ class ProtenixDesignTrain(ProtenixDesign):
                         "diffusion_internal: a_token not captured; falling back to s_inputs"
                     )
                 else:
-                    token_repr = a.mean(dim=-3).to(s_inputs.dtype)  # mean-reduce N_sample
+                    token_repr = self._reduce_a_token(a, sigma).to(s_inputs.dtype)
+                    # Gradient control: scale the AA gradient flowing into the
+                    # shared coord trunk (protects coordinates).
+                    g = self.aa_trunk_grad_scale
+                    if g != 1.0:
+                        token_repr = g * token_repr + (1.0 - g) * token_repr.detach()
                     out["a_token_shape"] = torch.tensor(list(a.shape))
             out["aa_logits"] = self.design_residue_type_head(token_repr, aa_t=aa_t)
 

@@ -175,6 +175,41 @@ def test_cropper_via_atom_mask_matches_chain_id():
     )
 
 
+def test_slice_feature_dict_crops_pair_tensor_on_both_axes():
+    """Regression: a [N_token, N_token] pair tensor must be cropped on BOTH
+    token axes, not just axis 0. The old length-dispatch matched axis 0 first
+    and left axis 1 uncropped -> [crop, N_token_orig] size mismatch downstream.
+    """
+    from pxdesign_train.data import DesignCropper
+    from pxdesign_train.runner.data import _slice_feature_dict
+
+    aa, tokens, n_a, n_b, n_c = _make_synthetic_complex()
+    n_token_orig = len(tokens)          # 30
+    n_atom_orig = len(aa)               # 120
+    crop_size = n_c + n_a               # 18 (real crop: 30 -> 18)
+    crop = DesignCropper(crop_size=crop_size).crop(aa, tokens, binder_chain_id="C")
+    n_token_new = len(crop.token_array)
+    n_atom_new = len(crop.atom_array)
+
+    feat = {
+        # [N_token, N_token] pair tensor (the bug target)
+        "z_pair": torch.arange(n_token_orig * n_token_orig).float().reshape(
+            n_token_orig, n_token_orig
+        ),
+        # per-token tensor (must still crop on axis 0)
+        "restype": torch.zeros(n_token_orig, 32),
+        # msa [depth, N_token] (must still crop on axis 1 only)
+        "msa": torch.ones(1, n_token_orig),
+        # per-atom tensor
+        "rep": torch.zeros(n_atom_orig, dtype=torch.long),
+    }
+    sliced = _slice_feature_dict(feat, aa, tokens, crop)
+    assert sliced["z_pair"].shape == (n_token_new, n_token_new)
+    assert sliced["restype"].shape == (n_token_new, 32)
+    assert sliced["msa"].shape == (1, n_token_new)
+    assert sliced["rep"].shape == (n_atom_new,)
+
+
 def test_cropper_then_featurizer_end_to_end():
     """Cropped output should feed cleanly into DesignFeaturizer."""
     from pxdesign_train.data import DesignCropper, DesignFeaturizer, DesignSelection

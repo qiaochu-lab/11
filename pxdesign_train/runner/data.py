@@ -184,6 +184,12 @@ def _slice_feature_dict(
         for cid, rid in zip(orig_atom_array.chain_id, orig_atom_array.res_id)
     ])
 
+    # Index tensors for cropping any axis (a pair tensor has TWO token axes;
+    # an msa tensor has a token axis at position 1). We slice EVERY axis whose
+    # length matches a known original size, not just the leading one.
+    token_keep_idx = torch.from_numpy(np.nonzero(token_keep_mask)[0]).long()
+    atom_keep_idx = torch.from_numpy(np.nonzero(atom_keep_mask)[0]).long()
+
     sliced: dict[str, torch.Tensor] = {}
     for k, v in feat.items():
         if not isinstance(v, torch.Tensor):
@@ -192,16 +198,15 @@ def _slice_feature_dict(
         if v.dim() == 0:
             sliced[k] = v
             continue
-        # Try to match an axis by length.
-        if v.shape[0] == n_token_orig:
-            v = v[token_keep_mask]
-        elif v.shape[0] == n_atom_orig:
-            v = v[atom_keep_mask]
-        elif v.dim() >= 2 and v.shape[1] == n_token_orig:
-            # e.g. msa [N_msa, N_token]
-            v = v[:, token_keep_mask]
-        # Else leave unchanged (could be a scalar / pair / extra dim that
-        # the design featurizer either doesn't use or recomputes).
+        # Slice each axis independently by matching its length. Token axes are
+        # checked before atom axes so a token/atom size collision (e.g. CA-only
+        # inputs where N_token == N_atom) keeps the historical token preference.
+        for axis in range(v.dim()):
+            if v.shape[axis] == n_token_orig:
+                v = v.index_select(axis, token_keep_idx.to(v.device))
+            elif v.shape[axis] == n_atom_orig:
+                v = v.index_select(axis, atom_keep_idx.to(v.device))
+            # Else leave this axis unchanged (feature/embedding dim etc.).
         sliced[k] = v
     return sliced
 

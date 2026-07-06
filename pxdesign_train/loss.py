@@ -25,6 +25,8 @@ import torch.nn.functional as F
 from protenix.model.loss import SmoothLDDTLoss
 from protenix.metrics.rmsd import weighted_rigid_align
 
+from pxdesign_train.sidechain.losses import sidechain_local_loss
+
 
 class PXDesignLoss(nn.Module):
     """Composite loss for PXDesign-d training.
@@ -57,9 +59,13 @@ class PXDesignLoss(nn.Module):
         aa_ignore_index: int = -100,
         aa_time_weighting: bool = False,
         aa_time_eps: float = 1e-2,
+        weight_sc_local: float = 1.0,
+        weight_sc_phys: float = 0.1,
         eps: float = 1e-6,
     ) -> None:
         super().__init__()
+        self.weight_sc_local = weight_sc_local
+        self.weight_sc_phys = weight_sc_phys
         self.weight_mse = weight_mse
         self.weight_lddt = weight_lddt
         self.weight_disto = weight_disto
@@ -219,6 +225,11 @@ class PXDesignLoss(nn.Module):
         aa_clean: Optional[torch.Tensor] = None,           # [..., N_token]
         aa_loss_mask: Optional[torch.Tensor] = None,       # [..., N_token]
         aa_t: Optional[torch.Tensor] = None,               # [...] masked-diffusion time
+        sc_pred_local: Optional[torch.Tensor] = None,      # [..., L, A, 3]
+        sc_gt_local: Optional[torch.Tensor] = None,        # [..., L, A, 3]
+        sc_atom_mask: Optional[torch.Tensor] = None,       # [..., L, A] bool
+        sc_type_match: Optional[torch.Tensor] = None,      # [..., L] bool (pred==gt type)
+        sc_phys: Optional[torch.Tensor] = None,            # precomputed physical loss scalar
     ) -> dict[str, torch.Tensor]:
         """Compute the composite loss.
 
@@ -274,6 +285,21 @@ class PXDesignLoss(nn.Module):
             aa_acc = torch.zeros_like(aa_ce).detach()
             aa_mask_frac = torch.zeros_like(aa_ce).detach()
 
+        # --- Side-chain terms (Stage II-A onwards) ---
+        # Local-frame coordinate loss, routed to type-matched residues only.
+        # The physical loss (global-frame, needs ideal-geometry tables) is
+        # computed upstream and passed in as `sc_phys`.
+        if sc_pred_local is not None and sc_gt_local is not None and sc_atom_mask is not None:
+            coord_mask = sc_atom_mask.bool()
+            if sc_type_match is not None:
+                coord_mask = coord_mask & sc_type_match.bool()[..., None]
+            sc_local = sidechain_local_loss(sc_pred_local, sc_gt_local, coord_mask)
+            sc_phys_val = sc_phys if sc_phys is not None else total.sum() * 0.0
+            total = total + self.weight_sc_local * sc_local + self.weight_sc_phys * sc_phys_val
+        else:
+            sc_local = total.sum() * 0.0
+            sc_phys_val = total.sum() * 0.0
+
         return {
             "loss": total.mean(),
             "mse": mse.mean().detach(),
@@ -283,4 +309,6 @@ class PXDesignLoss(nn.Module):
             "aa_ce": aa_ce.detach(),
             "aa_acc": aa_acc,
             "aa_mask_frac": aa_mask_frac,
+            "sc_local": sc_local.detach(),
+            "sc_phys": sc_phys_val.detach(),
         }

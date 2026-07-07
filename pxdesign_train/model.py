@@ -230,8 +230,12 @@ class ProtenixDesignTrain(ProtenixDesign):
 
         # 4. Side-Chain Module (Stage II-A): one-step local-frame decode + feedback.
         if self.enable_sidechain and "sc_atom_name_ids" in input_feature_dict:
-            h_res = out["h_res_candidate"]          # [B, N_token, c_res]
-            aa_logits = out["aa_logits"]            # [B, N_token, n_type]
+            h_res = out["h_res_candidate"]          # [N_token, c_res] or [B, N_token, c_res]
+            aa_logits = out["aa_logits"]            # matching leading dims
+            squeeze = h_res.dim() == 2              # batch=1 collapsed upstream
+            if squeeze:
+                h_res = h_res.unsqueeze(0)
+                aa_logits = aa_logits.unsqueeze(0)
             sc_ids = input_feature_dict["sc_atom_name_ids"]
             sc_mask = input_feature_dict["sc_atom_mask"]
             if sc_ids.dim() == 2:                   # add batch dim
@@ -245,16 +249,21 @@ class ProtenixDesignTrain(ProtenixDesign):
             sc_mask = sc_mask.to(h_res.device).bool()
             noisy = gaussian_init_local(
                 sc_mask.detach().cpu(), sigma=self.sc_init_sigma
-            ).to(h_res.device)
+            ).to(h_res.device).to(h_res.dtype)
             t = torch.ones(B, device=h_res.device)
             y0_local, atom_feats = self.sidechain_module(
                 h_res, aa_logits, sc_ids, sc_mask, noisy, t,
             )
-            out["sc_pred_local"] = y0_local
-            out["sc_atom_mask"] = sc_mask
-            out["h_res_prime"] = self.sidechain_feedback(
+            h_res_prime = self.sidechain_feedback(
                 atom_feats, sc_mask, h_res, detach=self.sc_detach_feedback,
             )
+            if squeeze:                             # restore the collapsed batch dim
+                y0_local = y0_local.squeeze(0)
+                sc_mask = sc_mask.squeeze(0)
+                h_res_prime = h_res_prime.squeeze(0)
+            out["sc_pred_local"] = y0_local
+            out["sc_atom_mask"] = sc_mask
+            out["h_res_prime"] = h_res_prime
 
         return out
 

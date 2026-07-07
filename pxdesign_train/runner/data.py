@@ -92,6 +92,7 @@ class DesignSourceDataset(Dataset):
     aa_mask_prob: float = 1.0
     aa_mask_min_prob: float = 0.0
     aa_mask_max_prob: float = 1.0
+    compute_sidechain: bool = False
     seed: int = 0
     _cropper: DesignCropper = field(init=False)
 
@@ -126,6 +127,7 @@ class DesignSourceDataset(Dataset):
             aa_mask_prob=self.aa_mask_prob,
             aa_mask_min_prob=self.aa_mask_min_prob,
             aa_mask_max_prob=self.aa_mask_max_prob,
+            compute_sidechain=self.compute_sidechain,
             rng=rng,
         )
         new_feat, new_label, new_aa = DesignFeaturizer(selection).transform(

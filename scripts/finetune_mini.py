@@ -31,6 +31,7 @@ def build(args, device):
         provider, source_name="cif", crop_size=args.crop_size,
         hotspot_force_zero_prob=0.0,
         aa_mask_mode="time_dependent", aa_mask_min_prob=0.15, aa_mask_max_prob=1.0,
+        compute_sidechain=getattr(args, "sidechain_warmup", False),
         seed=0,
     )
     multi = CurriculumMultiDataset(datasets=[src], source_names=["cif"],
@@ -58,11 +59,13 @@ def build(args, device):
     configs.training.num_workers = 0
     configs.load_strict = False
     configs.loss.align_before_mse = (device.type == "cuda")
+    if getattr(args, "sidechain_warmup", False):
+        configs.enable_sidechain = True
     trainer = PXDesignTrainer(configs=configs, components=components, device=device)
     return trainer
 
 
-def make_batch_from_cif(trainer, cif, chain, crop_size):
+def make_batch_from_cif(trainer, cif, chain, crop_size, compute_sidechain=False):
     """Featurize one CIF into a device batch using the trainer's own collate."""
     from pxdesign_train.runner import DesignSourceDataset
     from pxdesign_train.runner.cif_provider import CifFileProvider
@@ -70,9 +73,20 @@ def make_batch_from_cif(trainer, cif, chain, crop_size):
     prov = CifFileProvider(cif_paths=[cif], binder_chain_ids=[chain])
     ds = DesignSourceDataset(
         prov, source_name="heldout", crop_size=crop_size, hotspot_force_zero_prob=0.0,
-        aa_mask_mode="time_dependent", aa_mask_min_prob=0.15, aa_mask_max_prob=1.0, seed=0)
+        aa_mask_mode="time_dependent", aa_mask_min_prob=0.15, aa_mask_max_prob=1.0,
+        compute_sidechain=compute_sidechain, seed=0)
     dl = DataLoader(ds, batch_size=1, collate_fn=trainer.train_dl.collate_fn)
     return trainer._to_device(next(iter(dl)))
+
+
+@torch.no_grad()
+def eval_sc(trainer, batch, k=8):
+    """Average side-chain local-frame loss on a batch's design residues."""
+    vals = []
+    for _ in range(k):
+        lo = trainer.forward_loss(batch)
+        vals.append(float(lo.get("sc_local", 0.0)))
+    return sum(vals) / max(1, len(vals))
 
 
 @torch.no_grad()
@@ -208,6 +222,8 @@ def main():
     ap.add_argument("--heldout_chain", default="")
     ap.add_argument("--heldout_eval", action="store_true",
                     help="Fine-tune on train_cifs, report AA recovery on a train vs held-out structure")
+    ap.add_argument("--sidechain_warmup", action="store_true",
+                    help="Stage II-A: enable S_phi, memorize side chains, report sc_local pre->post")
     ap.add_argument("--out", default="mini_experiment.json")
     args = ap.parse_args()
     device = torch.device(args.device)
@@ -257,6 +273,27 @@ def main():
         with open(args.out, "w") as f:
             _json.dump({"args": vars(args), "pre": pre, "post": post}, f, indent=2)
         print(f"saved -> {args.out}\nCOORD EVAL OK")
+        return
+
+    # ---- side-chain Stage II-A warmup (memorization demo) ----
+    if args.sidechain_warmup:
+        import json as _json
+        cif0 = (args.train_cifs.split(",")[0] if args.train_cifs else args.cif)
+        chain0 = (args.train_chains.split(",")[0] if args.train_chains else args.binder_chain)
+        batch = make_batch_from_cif(trainer, cif0, chain0, args.crop_size, compute_sidechain=True)
+        has_sc = "sc_atom_name_ids" in batch["input_feature_dict"]
+        n_sc = int(batch["input_feature_dict"].get("sc_atom_mask").sum()) if has_sc else 0
+        print(f"sidechain fields present: {has_sc} | GT side-chain atoms: {n_sc}")
+        pre = eval_sc(trainer, batch)
+        if args.max_steps > 0:
+            print(f"\n=== side-chain warmup {args.max_steps} steps ===")
+            trainer.run(max_steps=args.max_steps)
+        post = eval_sc(trainer, batch)
+        print(f"\n=== sc_local (pre -> post): {pre:.4f} -> {post:.4f} ===")
+        with open(args.out, "w") as f:
+            _json.dump({"args": vars(args), "sc_local_pre": pre, "sc_local_post": post,
+                        "sc_fields_present": has_sc, "n_sc_atoms": n_sc}, f, indent=2)
+        print(f"saved -> {args.out}\nSIDECHAIN WARMUP OK")
         return
 
     # ---- joint co-generation from noise (structure + sequence), then exit ----

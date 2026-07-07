@@ -25,6 +25,9 @@ from pxdesign_train.heads import (
     DesignDistogramHead,
     DesignResidueTypeHead,
 )
+from pxdesign_train.sidechain.module import SideChainModule
+from pxdesign_train.sidechain.feedback import HResFeedback
+from pxdesign_train.sidechain.init import gaussian_init_local
 
 
 class ProtenixDesignTrain(ProtenixDesign):
@@ -113,6 +116,27 @@ class ProtenixDesignTrain(ProtenixDesign):
                 def _capture_a_token(_module, _inp, out):
                     self._a_token_cache = out
                 self.diffusion_module.layernorm_a.register_forward_hook(_capture_a_token)
+
+        # ---- Side-Chain Module S_phi (Stage II-A) ----
+        self.enable_sidechain = getattr(configs, "enable_sidechain", False)
+        if self.enable_sidechain:
+            assert self.enable_residue_type_head, (
+                "enable_sidechain requires enable_residue_type_head (S_phi conditions "
+                "on the residue-type logits and reads the same h_res=a_token)."
+            )
+            sc_cfg = getattr(configs, "sidechain", None)
+            # h_res dim == the representation the AA head reads (a_token c_token
+            # for diffusion_internal, else s_inputs dim).
+            self.sc_c_res = c_in
+            self.sc_init_sigma = float(getattr(sc_cfg, "init_sigma", 1.0)) if sc_cfg is not None else 1.0
+            self.sc_detach_feedback = bool(getattr(sc_cfg, "detach_feedback", False)) if sc_cfg is not None else False
+            sc_grad_scale = float(getattr(sc_cfg, "trunk_grad_scale", 1.0)) if sc_cfg is not None else 1.0
+            c_atom = int(getattr(sc_cfg, "c_atom", 128)) if sc_cfg is not None else 128
+            self.sidechain_module = SideChainModule(
+                c_res=self.sc_c_res, c_atom=c_atom, n_type=vocab_size,
+                trunk_grad_scale=sc_grad_scale,
+            )
+            self.sidechain_feedback = HResFeedback(c_atom=c_atom, c_res=self.sc_c_res)
 
     def _reduce_a_token(self, a: torch.Tensor, sigma: Optional[torch.Tensor]) -> torch.Tensor:
         """Collapse a_token's N_sample axis (dim -3).
@@ -203,6 +227,34 @@ class ProtenixDesignTrain(ProtenixDesign):
             # baseline. This is what a future h_res module should consume.
             out["h_res_candidate"] = token_repr
             out["aa_logits"] = self.design_residue_type_head(token_repr, aa_t=aa_t)
+
+        # 4. Side-Chain Module (Stage II-A): one-step local-frame decode + feedback.
+        if self.enable_sidechain and "sc_atom_name_ids" in input_feature_dict:
+            h_res = out["h_res_candidate"]          # [B, N_token, c_res]
+            aa_logits = out["aa_logits"]            # [B, N_token, n_type]
+            sc_ids = input_feature_dict["sc_atom_name_ids"]
+            sc_mask = input_feature_dict["sc_atom_mask"]
+            if sc_ids.dim() == 2:                   # add batch dim
+                sc_ids = sc_ids.unsqueeze(0)
+                sc_mask = sc_mask.unsqueeze(0)
+            B = h_res.shape[0]
+            if sc_ids.shape[0] != B:
+                sc_ids = sc_ids.expand(B, -1, -1)
+                sc_mask = sc_mask.expand(B, -1, -1)
+            sc_ids = sc_ids.to(h_res.device).long()
+            sc_mask = sc_mask.to(h_res.device).bool()
+            noisy = gaussian_init_local(
+                sc_mask.detach().cpu(), sigma=self.sc_init_sigma
+            ).to(h_res.device)
+            t = torch.ones(B, device=h_res.device)
+            y0_local, atom_feats = self.sidechain_module(
+                h_res, aa_logits, sc_ids, sc_mask, noisy, t,
+            )
+            out["sc_pred_local"] = y0_local
+            out["sc_atom_mask"] = sc_mask
+            out["h_res_prime"] = self.sidechain_feedback(
+                atom_feats, sc_mask, h_res, detach=self.sc_detach_feedback,
+            )
 
         return out
 

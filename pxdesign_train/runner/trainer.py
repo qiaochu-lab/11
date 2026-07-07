@@ -278,6 +278,9 @@ class PXDesignTrainer:
             aa_clean=batch["input_feature_dict"].get("aa_clean"),
             aa_loss_mask=batch["input_feature_dict"].get("aa_loss_mask"),
             aa_t=batch["input_feature_dict"].get("aa_t"),
+            sc_pred_local=out.get("sc_pred_local"),
+            sc_gt_local=batch["input_feature_dict"].get("sc_gt_local"),
+            sc_atom_mask=out.get("sc_atom_mask"),
         )
         return loss_out
 

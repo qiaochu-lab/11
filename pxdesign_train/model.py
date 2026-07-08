@@ -29,6 +29,8 @@ from pxdesign_train.sidechain.module import SideChainModule
 from pxdesign_train.sidechain.feedback import HResFeedback
 from pxdesign_train.sidechain.init import gaussian_init_local
 from pxdesign_train.sidechain.coevolution import HResInjector
+from pxdesign_train.sidechain.frames import to_global
+from pxdesign_train.sidechain.physical import physical_loss
 
 
 class ProtenixDesignTrain(ProtenixDesign):
@@ -277,6 +279,29 @@ class ProtenixDesignTrain(ProtenixDesign):
             out["sc_pred_local"] = y0_local
             out["sc_atom_mask"] = sc_mask
             out["h_res_prime"] = h_res_prime
+
+            # Physical regularization (clash + contact) on predicted GLOBAL
+            # side-chain coords: local -> global via the residue frames, then a
+            # coordinate-only physical loss (no ideal-geometry tables needed).
+            fR = input_feature_dict.get("sc_frame_R")
+            ft = input_feature_dict.get("sc_frame_t")
+            bb = input_feature_dict.get("sc_bb_coords")
+            if fR is not None and ft is not None and bb is not None:
+                y_l = y0_local if y0_local.dim() == 4 else y0_local.unsqueeze(0)  # [B,L,A,3]
+                fR = fR.to(y_l.device).float()
+                ft = ft.to(y_l.device).float()
+                bb = bb.to(y_l.device).float()
+                if fR.dim() == 3:
+                    fR, ft, bb = fR.unsqueeze(0), ft.unsqueeze(0), bb.unsqueeze(0)
+                B_, L_, A_ = y_l.shape[0], y_l.shape[1], y_l.shape[2]
+                y_g = to_global(y_l.float(), fR, ft)                     # [B,L,A,3]
+                m = sc_mask if sc_mask.dim() == 3 else sc_mask.unsqueeze(0)
+                phys = physical_loss(
+                    y_g.reshape(B_, L_ * A_, 3),
+                    backbone_coords=bb.reshape(B_, L_ * bb.shape[2], 3),
+                    valid_mask=m.reshape(B_, L_ * A_),
+                )
+                out["sc_phys_val"] = phys["total"]
 
         # 5. Cycle closure (Stage II-B): reuse B_theta to refine backbone/type
         #    using the side-chain-informed h_res'. h_res' is injected into the

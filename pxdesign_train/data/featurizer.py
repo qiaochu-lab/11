@@ -375,6 +375,9 @@ class DesignFeaturizer:
         sc_gt_local = np.zeros((n_token, MAX_SC, 3), dtype=np.float32)
         sc_mask = np.zeros((n_token, MAX_SC), dtype=bool)
         sc_ids = np.zeros((n_token, MAX_SC), dtype=np.int64)
+        sc_frame_R = np.tile(np.eye(3, dtype=np.float32), (n_token, 1, 1))
+        sc_frame_t = np.zeros((n_token, 3), dtype=np.float32)
+        sc_bb_coords = np.zeros((n_token, 4, 3), dtype=np.float32)  # N,CA,C,O
 
         for ti, ai in enumerate(rep_idx):
             if not binder[ai]:
@@ -386,6 +389,11 @@ class DesignFeaturizer:
             ca = torch.from_numpy(coord[atoms["CA"]])[None]
             c = torch.from_numpy(coord[atoms["C"]])[None]
             R, t = build_frame(n, ca, c)
+            sc_frame_R[ti] = R[0].numpy()
+            sc_frame_t[ti] = t[0].numpy()
+            for bi, bn in enumerate(("N", "CA", "C", "O")):
+                if bn in atoms:
+                    sc_bb_coords[ti, bi] = coord[atoms[bn]]
             for j, nm in enumerate(sidechain_atoms(str(res_name[ai]))):
                 if j >= MAX_SC:
                     break
@@ -399,6 +407,9 @@ class DesignFeaturizer:
             "sc_gt_local": torch.from_numpy(sc_gt_local),
             "sc_atom_mask": torch.from_numpy(sc_mask),
             "sc_atom_name_ids": torch.from_numpy(sc_ids),
+            "sc_frame_R": torch.from_numpy(sc_frame_R),
+            "sc_frame_t": torch.from_numpy(sc_frame_t),
+            "sc_bb_coords": torch.from_numpy(sc_bb_coords),
         }
 
     @staticmethod

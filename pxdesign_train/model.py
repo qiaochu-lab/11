@@ -266,8 +266,15 @@ class ProtenixDesignTrain(ProtenixDesign):
                 sc_mask.detach().cpu(), sigma=self.sc_init_sigma
             ).to(h_res.device).to(h_res.dtype)
             t = torch.ones(B, device=h_res.device)
+            ca = input_feature_dict.get("sc_frame_t")
+            if ca is not None:
+                ca = ca.to(h_res.device).float()
+                if ca.dim() == 2:
+                    ca = ca.unsqueeze(0)
+                if ca.shape[0] != B:
+                    ca = ca.expand(B, -1, -1)
             y0_local, atom_feats = self.sidechain_module(
-                h_res, aa_logits, sc_ids, sc_mask, noisy, t,
+                h_res, aa_logits, sc_ids, sc_mask, noisy, t, ca_coords=ca,
             )
             h_res_prime = self.sidechain_feedback(
                 atom_feats, sc_mask, h_res, detach=self.sc_detach_feedback,

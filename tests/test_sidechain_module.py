@@ -48,6 +48,16 @@ def test_forward_shape_and_padding():
     assert torch.count_nonzero(y0[0, 2, 5:]) == 0     # LYS: 5 valid
 
 
+def test_cross_residue_attention_runs():
+    _, atom_mask, atom_ids, h_res, logits, noisy, t = _toy_batch()
+    ca = torch.randn(1, 3, 3)  # [B, L, 3] residue CA coords
+    y0, feats = _module().forward(h_res, logits, atom_ids, atom_mask, noisy, t, ca_coords=ca)
+    assert y0.shape == (1, 3, MAX_SC, 3)
+    assert torch.isfinite(y0).all()
+    y0.sum().backward()
+    assert h_res.grad is not None and torch.count_nonzero(h_res.grad) > 0
+
+
 def test_gly_no_nan():
     restypes = ["GLY"]  # zero side-chain atoms -> fully padded residue
     atom_mask = sidechain_mask(restypes)[None]

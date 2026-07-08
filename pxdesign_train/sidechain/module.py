@@ -20,11 +20,45 @@ valid S_phi backbone, which is what we implement (and can unit-test on CPU).
 """
 from typing import Optional
 
+import math
+
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from pxdesign_train.heads import sinusoidal_time_embedding
 from pxdesign_train.sidechain.instantiate import ATOM_VOCAB_SIZE
+
+
+class _CrossResBlock(nn.Module):
+    """Cross-residue geometric attention: each residue's pooled side-chain
+    feature attends to nearby residues, with attention biased by CA-CA distance
+    (closer residues attend more). Captures the Overleaf's "cross-residue
+    geometric attention between nearby atoms" — side-chain<->side-chain and
+    side-chain<->backbone interactions, at residue-pooled granularity."""
+
+    def __init__(self, c: int) -> None:
+        super().__init__()
+        self.ln = nn.LayerNorm(c)
+        self.q = nn.Linear(c, c)
+        self.k = nn.Linear(c, c)
+        self.v = nn.Linear(c, c)
+        self.o = nn.Linear(c, c)
+        self.dist_scale = nn.Parameter(torch.tensor(0.1))
+        self.c = c
+
+    def forward(self, x, ca, res_mask):
+        # x [B,L,c], ca [B,L,3], res_mask [B,L] bool
+        h = self.ln(x)
+        q, k, v = self.q(h), self.k(h), self.v(h)
+        scores = (q @ k.transpose(-1, -2)) / math.sqrt(self.c)     # [B,L,L]
+        d = torch.cdist(ca, ca)                                    # [B,L,L]
+        scores = scores - F.softplus(self.dist_scale) * d          # closer -> higher
+        scores = scores.masked_fill(~res_mask[:, None, :], float("-inf"))
+        attn = torch.softmax(scores, dim=-1)
+        attn = torch.nan_to_num(attn)                             # rows with no valid key
+        out = attn @ v                                            # [B,L,c]
+        return x + self.o(out)
 
 
 class _AtomBlock(nn.Module):
@@ -70,6 +104,7 @@ class SideChainModule(nn.Module):
         self.w_xyz = nn.Linear(3, c_atom)
 
         self.blocks = nn.ModuleList([_AtomBlock(c_atom, n_heads) for _ in range(n_blocks)])
+        self.cross_res = _CrossResBlock(c_atom)
         self.out_ln = nn.LayerNorm(c_atom)
         self.out = nn.Linear(c_atom, 3)
 
@@ -87,6 +122,7 @@ class SideChainModule(nn.Module):
         atom_mask: torch.Tensor,      # [B, L, A] bool
         noisy_local: torch.Tensor,    # [B, L, A, 3]
         t: torch.Tensor,              # [B] or scalar diffusion time
+        ca_coords: Optional[torch.Tensor] = None,  # [B, L, 3] residue CA (frame origin)
     ):
         B, L, A = atom_name_ids.shape
         h_res = self._scale_grad(h_res)
@@ -109,6 +145,14 @@ class SideChainModule(nn.Module):
         for blk in self.blocks:
             x = blk(x, key_padding_mask=kpm)
         atom_feats = x.reshape(B, L, A, self.c_atom)
+
+        # Cross-residue geometric attention (side-chain<->neighbour context).
+        if ca_coords is not None:
+            am = atom_mask.to(atom_feats.dtype)[..., None]         # [B,L,A,1]
+            res_feat = (atom_feats * am).sum(2) / (am.sum(2) + 1e-6)  # [B,L,c]
+            res_mask = atom_mask.any(dim=-1)                        # [B,L] bool
+            res_ctx = self.cross_res(res_feat, ca_coords, res_mask)  # [B,L,c]
+            atom_feats = atom_feats + res_ctx[:, :, None, :]        # broadcast back
 
         y0_local = self.out(self.out_ln(atom_feats))       # [B, L, A, 3]
         y0_local = y0_local * atom_mask[..., None].to(y0_local.dtype)

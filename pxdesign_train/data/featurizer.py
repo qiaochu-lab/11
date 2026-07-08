@@ -95,6 +95,11 @@ class DesignSelection:
     aa_mask_max_prob: float = 1.0
     aa_mask_prob: float = 1.0
     compute_sidechain: bool = False
+    # M1: emit `backbone_loss_mask` that excludes binder (design-token)
+    # side-chain atoms from the backbone (L_bb) coordinate target, so B_theta is
+    # backbone-only and S_phi is the sole side-chain generator. This also matches
+    # de-novo inference, where the binder has no side-chain atoms.
+    backbone_only_binder: bool = False
     rng: Optional[np.random.Generator] = None
 
     def __post_init__(self):
@@ -221,6 +226,24 @@ class DesignFeaturizer:
             binder_atom_mask=binder_atom_mask,
             token_is_design=token_is_design,
         )
+
+        # 6b. Backbone-only binder (M1 + P1): B_theta must be backbone-only for
+        #     the design region — both in the loss AND in the diffusion INPUT.
+        #     (i) backbone_loss_mask: exclude binder side-chain atoms from L_bb.
+        #     (ii) scrub the binder side-chain COORDINATES to the residue Cα so the
+        #     denoiser never sees noisy GT side-chain geometry (which would leak
+        #     into a_token / h_res). GT side-chain targets for S_phi were already
+        #     captured above (step 1b) from the real coords, so this is safe.
+        if self.selection.backbone_only_binder:
+            feature_dict["backbone_loss_mask"] = self._backbone_loss_mask(
+                atom_array, binder_atom_mask
+            )
+            feature_dict["design_sidechain_atom_mask"] = ~self._backbone_loss_mask(
+                atom_array, binder_atom_mask
+            )
+            label_dict = self._scrub_design_sidechain_coords(
+                atom_array, label_dict, binder_atom_mask
+            )
 
         # 7. pLDDT placeholder: zeros at train time (no predicted confidence).
         feature_dict["plddt"] = torch.zeros(
@@ -411,6 +434,52 @@ class DesignFeaturizer:
             "sc_frame_t": torch.from_numpy(sc_frame_t),
             "sc_bb_coords": torch.from_numpy(sc_bb_coords),
         }
+
+    @staticmethod
+    def _backbone_loss_mask(atom_array, binder_atom_mask: np.ndarray) -> torch.Tensor:
+        """Per-atom [N_atom] bool: True everywhere except binder side-chain atoms.
+
+        Backbone atoms (N/CA/C/O) of binder residues stay True (they ARE the
+        backbone target); non-binder atoms all stay True; binder heavy side-chain
+        atoms become False so `L_bb` never supervises them — S_phi is the sole
+        side-chain generator (M1). Called on the (real-atom-name) AtomArray;
+        res_name/xpb marking does not affect atom_name, so ordering is safe.
+        """
+        atom_name = np.asarray(atom_array.atom_name)
+        binder = np.asarray(binder_atom_mask, dtype=bool)
+        is_backbone = np.isin(atom_name, np.asarray(XPB_BACKBONE_ATOM_NAMES))
+        keep = ~(binder & ~is_backbone)  # drop only binder side-chain atoms
+        return torch.from_numpy(keep.astype(bool))
+
+    @staticmethod
+    def _scrub_design_sidechain_coords(atom_array, label_dict, binder_atom_mask):
+        """Replace binder (design-region) side-chain atom coordinates with their
+        residue Cα (P1). This removes GT side-chain geometry from the coordinate
+        diffusion INPUT so B_theta / a_token / h_res cannot see it — the atoms
+        remain as tokens (no re-tokenisation) but carry no side-chain signal.
+        Backbone atoms and all non-binder atoms are untouched. Idempotent-safe:
+        returns a new label_dict with a cloned `coordinate`.
+        """
+        if "coordinate" not in label_dict:
+            return label_dict
+        coord = label_dict["coordinate"]
+        new = coord.clone()
+        atom_name = np.asarray(atom_array.atom_name)
+        chain = np.asarray(atom_array.chain_id)
+        res = np.asarray(atom_array.res_id)
+        binder = np.asarray(binder_atom_mask, dtype=bool)
+        is_backbone = np.isin(atom_name, np.asarray(XPB_BACKBONE_ATOM_NAMES))
+        ca_of = {}
+        for i in range(len(atom_array)):
+            if atom_name[i] == "CA":
+                ca_of[(chain[i], res[i])] = i
+        n = new.shape[-2]
+        for i in range(len(atom_array)):
+            if i < n and binder[i] and not is_backbone[i]:
+                ci = ca_of.get((chain[i], res[i]))
+                if ci is not None and ci < n:
+                    new[..., i, :] = coord[..., ci, :]
+        return {**label_dict, "coordinate": new}
 
     @staticmethod
     def _token_level_mask(

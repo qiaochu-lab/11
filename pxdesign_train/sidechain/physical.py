@@ -5,9 +5,15 @@ undefined): we fall back to physics — chemical bond lengths, bond angles, ster
 clashes, and (stub) rotamer plausibility. Also usable as an auxiliary term when
 types match. All terms are differentiable and finite.
 
-This deliverable ships bond/angle/clash; `rotamer` is an intentional stub
-(returns 0) per the spec — FangWu flagged the exact rotamer/physical
-formulation as not finalized.
+Implementation status (keep in sync with README):
+  - clash, contact: implemented AND activated in training (the model computes
+    them on predicted global side chains, see model._train_forward).
+  - bond, angle, rotamer: implemented and unit-tested as differentiable terms,
+    but NOT activated in training — they require residue-specific ideal-geometry
+    tables (bond_idx/ideal, angle_idx/ideal_cos, torsion_idx/rotamer_targets)
+    that are not wired yet, so `physical_loss` only includes them when those
+    inputs are passed. `rotamer_loss` below is a real periodic dihedral penalty
+    (not a zero stub); it is simply not fed torsion tables at train time.
 """
 from typing import Optional
 

@@ -27,11 +27,14 @@ def build(args, device):
     cifs = args.train_cifs.split(",") if args.train_cifs else [args.cif]
     chains = args.train_chains.split(",") if args.train_chains else [args.binder_chain]
     provider = CifFileProvider(cif_paths=cifs, binder_chain_ids=chains)
+    _sc_on = getattr(args, "sidechain_warmup", False) or getattr(args, "coevolution", False) or getattr(args, "sc_cycle", False)
     src = DesignSourceDataset(
         provider, source_name="cif", crop_size=args.crop_size,
         hotspot_force_zero_prob=0.0,
         aa_mask_mode="time_dependent", aa_mask_min_prob=0.15, aa_mask_max_prob=1.0,
-        compute_sidechain=getattr(args, "sidechain_warmup", False) or getattr(args, "coevolution", False) or getattr(args, "sc_cycle", False),
+        compute_sidechain=_sc_on,
+        # M1: when S_phi is active, keep B_theta backbone-only for the binder.
+        backbone_only_binder=_sc_on,
         seed=0,
     )
     multi = CurriculumMultiDataset(datasets=[src], source_names=["cif"],
@@ -65,6 +68,17 @@ def build(args, device):
         configs.enable_coevolution = True
     if getattr(args, "sc_cycle", False):
         configs.enable_sidechain = True
+    # Stage II-A warmup isolation (P1/P2): S_phi-only warmup must NOT let the
+    # side-chain loss update the backbone trunk. Force read-only h_res (no grad
+    # into a_token/B_theta) unless we are in the joint co-evolution setting.
+    _warmup_only = getattr(args, "sidechain_warmup", False) and not (
+        getattr(args, "coevolution", False) or getattr(args, "sc_cycle", False)
+    )
+    if _warmup_only:
+        configs.sidechain.trunk_grad_scale = 0.0
+        # Stage II-A warmup: single reduced-h_res baseline (labeled as warmup, not
+        # per-sigma co-evolution). Cycle/coevolution keeps per_sigma=True.
+        configs.sidechain.per_sigma = False
     trainer = PXDesignTrainer(configs=configs, components=components, device=device)
     return trainer
 
@@ -78,7 +92,7 @@ def make_batch_from_cif(trainer, cif, chain, crop_size, compute_sidechain=False)
     ds = DesignSourceDataset(
         prov, source_name="heldout", crop_size=crop_size, hotspot_force_zero_prob=0.0,
         aa_mask_mode="time_dependent", aa_mask_min_prob=0.15, aa_mask_max_prob=1.0,
-        compute_sidechain=compute_sidechain, seed=0)
+        compute_sidechain=compute_sidechain, backbone_only_binder=compute_sidechain, seed=0)
     dl = DataLoader(ds, batch_size=1, collate_fn=trainer.train_dl.collate_fn)
     return trainer._to_device(next(iter(dl)))
 
@@ -356,6 +370,11 @@ def main():
         print(f"coord shape: {tuple(res['coordinate'].shape)}")
         print(f"generated design seq (aa20 idx, n={len(gen)}): {gen}")
         print(f"distinct residues used: {len(set(gen))}")
+        # Smoke-check: full-atom side-chain output present?
+        scd = res.get("sidechain", {})
+        n_sc_atoms = sum(int(v["coords"].shape[0]) for v in scd.values())
+        print(f"full-atom side-chain: has={res.get('has_full_atom_sidechain')} "
+              f"residues={len(scd)} atoms={n_sc_atoms}")
         ac = feat.get("aa_clean")
         while ac is not None and ac.dim() > 1:
             ac = ac.squeeze(0)

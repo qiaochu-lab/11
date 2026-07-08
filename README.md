@@ -51,6 +51,56 @@ data / model / loss / trainer / config (66 tests):
   **co-generating `(backbone, sequence)` from noise in one pass**, without an
   external inverse-folding step.
 
+### 3. Side-Chain Module (S_φ) — engineering prototype (smoke-tested)
+
+A residue-aware side-chain branch (`pxdesign_train/sidechain/`) that reads the
+shared residue representation + predicted AA logits, decodes side-chain atoms in a
+residue-local frame from Gaussian init (one-step, leakage-free), pools them back to
+an updated `h_res′`, and (in the cycle) runs a **second denoise pass with `h_res′`
+injection** (not a closed refinement of the first pass — see below).
+
+**Side-chain warmup and cycle wiring are implemented / being updated. The per-σ
+aligned side-chain/cycle path is the intended joint-training design. Current
+results are smoke tests / single-structure overfit, not method validation.** (No
+claim of: co-evolution fully validated · Stage III complete · leakage-free fully
+solved · full-atom design quality proven.)
+
+Status, graded honestly (see `reports/` for the full audit):
+
+| Piece | Status |
+|---|---|
+| One-step Gaussian init + local-frame `L_sc` | implemented, tested |
+| Dynamic per-residue atom instantiation (no ghost atoms) | implemented, tested |
+| `h_res′` atom→residue feedback + injection into `B_θ` | implemented, smoke-tested |
+| **B_θ backbone-only / S_φ owns side chains** (M1) | binder side chains excluded from `L_bb` **and** scrubbed (→ Cα) from the diffusion input, so B_θ never sees GT side-chain geometry |
+| **Per-σ aligned side-chain path** | S_φ reads a per-σ `h_res`/`aa_logits`/`sigma` (flattened `[B·N_sample, L, C]`), **not** a mean/low-σ-reduced `h_res`; each S_φ row = one specific σ, and its real σ feeds the time embedding. This is the intended joint-training design. |
+| Stage II-A warmup | single reduced-`h_res` baseline + `trunk_grad_scale=0` (side-chain loss can't update the backbone). Labeled as warmup/completion — **not** per-σ co-evolution. |
+| Cycle feedback (`h_res′` → B_θ) | **wiring implemented / being updated.** `s_trunk` is sample-shared in the Protenix diffusion, so `h_res′` is injected **σ-reduced** (true per-σ feedback needs a per-sample `s_trunk` = submodule change). Smoke-tested; `post_aa` stays gated (M2). |
+| physical loss: clash + contact | implemented **and activated** |
+| physical loss: bond / angle / rotamer | implemented, **not activated** (no residue-specific geometry tables wired) |
+| side-chain frames in training | built from **GT backbone** (fine for II-A warmup); predicted-backbone frames only at inference — II-B is not yet true predicted-backbone co-evolution |
+| type-mismatch loss routing (`route_sidechain_loss`) | **skeleton, not wired into training** |
+| Stage III `L_SC-AA` candidate ranking | core implemented + unit-tested, **not integrated** |
+| Full-atom side-chain output at inference (M3) | `cogenerate` now returns S_φ side-chain coords |
+
+**Two boundaries that must stay explicit:**
+1. **The cycle is a conservative smoke-test, not fully per-σ co-evolution.** `h_res′`
+   must be σ-averaged before it can be injected into Protenix's sample-shared
+   `s_trunk`, so the feedback is not per-σ. Call it a conservative cycle smoke-test —
+   **not** fully per-σ co-evolution.
+2. **Side-chain frames are still GT / II-A-style.** Training builds side-chain frames
+   from the GT backbone; predicted-backbone-frame training is not solved (at high σ
+   the predicted backbone is noise, and the GT-frame target then mismatches). So we
+   **cannot** claim predicted-backbone joint training is validated.
+
+**Deliberately NOT claimed:** method validated · co-evolution verified · fully per-σ
+co-evolution · predicted-backbone joint training validated · Stage III complete ·
+predicted-mask robustness · generalization / design quality. The co-evolution
+AA-refinement objective (`post_aa`) is **not supervised by default**
+(`sidechain.predicted_mask=False`, M2): under GT-type teacher-forcing the GT atom
+composition would leak residue identity into the AA head, so it stays off until the
+side-chain atom set is instantiated from *predicted* type.
+
 ---
 
 ## Design: where the AA head reads its information, and why
@@ -100,6 +150,18 @@ shows the coordinate error at σ∈{1,4,16} is **statistically identical** with 
 coupling (`trunk_grad_scale=1.0`), stop-grad (`0.0`), and the `s_inputs` baseline —
 i.e. **structure-aware AA does not cost coordinate quality**. A
 `trunk_grad_scale` knob is kept for re-checking at the multi-structure stage.
+
+### Per-sigma AA loss (not reduce-then-predict)
+Training draws `N_sample` structure-noise levels (σ) per item, so `a_token` is
+`[…, N_sample, N_token, c]`. The AA loss is computed **per sample (per σ) and then
+averaged** — it does **not** average/select the representation before the head.
+Averaging representations across σ would blur the conditioning; selecting the
+lowest-σ sample would bias the head toward clean-structure inverse folding and
+mismatch inference, where `cogenerate` queries the head across the whole σ
+trajectory. Per-σ loss is a Monte-Carlo estimate over the EDM σ distribution and
+mirrors how the coordinate MSE is already averaged over samples. `internal_reduce`
+(`mean`/`low_sigma`) now only picks the single reduced state that `h_res` / the
+side-chain module consume — it no longer affects the AA training target.
 
 ---
 

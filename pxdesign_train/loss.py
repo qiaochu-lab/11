@@ -186,7 +186,20 @@ class PXDesignLoss(nn.Module):
             aa_clean = aa_clean.squeeze(-1)
         aa_clean = aa_clean.long().to(aa_logits.device)
         aa_loss_mask = aa_loss_mask.bool().to(aa_logits.device)
-        valid = aa_loss_mask & (aa_clean != self.aa_ignore_index)  # [..., N_token]
+
+        # Per-sample (per-sigma) AA logits carry an extra N_sample axis at -3
+        # ([..., N_sample, N_token, 20]) while the labels/mask are per-token
+        # ([..., N_token]). `torch.gather` does NOT broadcast, so explicitly
+        # expand the labels/mask over the sample axis; the CE then averages over
+        # samples (== a Monte-Carlo estimate over the EDM sigma distribution) as
+        # well as tokens. When there is no sample axis this is a no-op.
+        if aa_logits.dim() == aa_clean.dim() + 2:
+            n_sample = aa_logits.shape[-3]
+            pre, n_tok = aa_clean.shape[:-1], aa_clean.shape[-1]
+            aa_clean = aa_clean.reshape(*pre, 1, n_tok).expand(*pre, n_sample, n_tok)
+            aa_loss_mask = aa_loss_mask.reshape(*pre, 1, n_tok).expand(*pre, n_sample, n_tok)
+
+        valid = aa_loss_mask & (aa_clean != self.aa_ignore_index)  # [..., (N_sample,) N_token]
         mask_frac = valid.float().mean()
         if not valid.any():
             zero = aa_logits.sum() * 0.0
@@ -220,6 +233,7 @@ class PXDesignLoss(nn.Module):
         sigma: torch.Tensor,                 # [..., N_sample]
         coordinate_mask: torch.Tensor,       # [..., N_atom]
         rep_atom_mask: torch.Tensor,         # [N_atom]
+        backbone_atom_mask: Optional[torch.Tensor] = None,  # [..., N_atom] M1: exclude binder side chains from L_bb
         distogram_logits: Optional[torch.Tensor] = None,  # [..., N_token, N_token, no_bins]
         aa_logits: Optional[torch.Tensor] = None,          # [..., N_token, 20]
         aa_clean: Optional[torch.Tensor] = None,           # [..., N_token]
@@ -241,6 +255,14 @@ class PXDesignLoss(nn.Module):
         Returns a dict with keys: "loss", "mse", "lddt", "distogram", "sigma_low_frac".
         Each component is a scalar (mean over batch).
         """
+        # M1: backbone-only target — zero out binder side-chain atoms so L_bb
+        # (MSE + LDDT + distogram share coordinate_mask) never supervises them.
+        # S_phi is the sole side-chain generator.
+        if backbone_atom_mask is not None:
+            coordinate_mask = coordinate_mask * backbone_atom_mask.to(
+                device=coordinate_mask.device, dtype=coordinate_mask.dtype
+            )
+
         # σ-mask: 1 where sigma < threshold, else 0. Per (batch, sample).
         sigma_low = (sigma < self.sigma_low_threshold).to(pred_coordinate.dtype)
 

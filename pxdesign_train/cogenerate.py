@@ -108,6 +108,9 @@ def cogenerate(
             if aot.numel() >= 3:
                 bb_atom_idx[tok] = aot[:3]  # N, CA, C (backbone-first ordering)
     h_res_prime_inject = None  # persistent side-chain-aware h_res across steps
+    # M3: keep the latest decoded side-chain global coords per committed token so
+    # the final result carries a full-atom (backbone + S_phi side-chain) output.
+    sidechain_out: dict[int, dict[str, Any]] = {}
 
     for step, (sig_t, sig_next) in enumerate(zip(noise_schedule[:-1], noise_schedule[1:])):
         feat["restype"] = restype.unsqueeze(0) if input_feature_dict["restype"].dim() == 3 else restype
@@ -158,9 +161,9 @@ def cogenerate(
             committed = [int(j) for j in positions.tolist()
                          if (not bool(still[j])) and (j in bb_atom_idx) and int(sampled[j]) >= 0]
             if committed:
-                from pxdesign_train.sidechain.frames import build_frame
+                from pxdesign_train.sidechain.frames import build_frame, to_global
                 from pxdesign_train.sidechain.instantiate import (
-                    sidechain_atom_name_ids, sidechain_mask,
+                    sidechain_atom_name_ids, sidechain_atoms, sidechain_mask,
                 )
                 from pxdesign_train.sidechain.init import gaussian_init_local
 
@@ -176,10 +179,24 @@ def cogenerate(
                 a_full = a_red.squeeze(0) if a_red.dim() == 3 else a_red   # [N_token, c]
                 h_c = a_full[committed]
                 l_c = logits[committed]
-                _, atom_feats = model.sidechain_module(
+                # Sigma-embedding = this step's real noise level (EDM c_noise),
+                # matching per-sigma training — not a constant.
+                sc_t = (0.25 * sig_t.reshape(1).clamp_min(1e-4).log()).to(device)
+                y0_local, atom_feats = model.sidechain_module(
                     h_c[None], l_c[None], ids[None], m[None], noisy[None],
-                    torch.ones(1, device=device), ca_coords=t[None].float(),
+                    sc_t, ca_coords=t[None].float(),
                 )
+                # M3: map predicted local side-chain coords -> global via the
+                # predicted-backbone frame, and store per committed residue.
+                y0_global = to_global(y0_local.float(), R[None].float(), t[None].float())[0]  # [Nc, A, 3]
+                for ci, j in enumerate(committed):
+                    names = sidechain_atoms(restypes3[ci])
+                    k = len(names)
+                    sidechain_out[int(j)] = {
+                        "restype3": restypes3[ci],
+                        "atom_names": names,
+                        "coords": y0_global[ci, :k].detach().cpu(),  # [k, 3] global
+                    }
                 h_prime = model.sidechain_feedback(atom_feats, m[None], h_c[None]).squeeze(0)
                 full = a_full.clone()
                 full[committed] = h_prime.to(full.dtype)
@@ -193,4 +210,13 @@ def cogenerate(
             "sc_committed": len(committed) if sc_enabled and float(sig_t) <= sc_start_frac * float(noise_schedule[0]) else 0,
         })
 
-    return {"coordinate": x.squeeze(0), "sequence": sampled, "trajectory": trajectory}
+    # M3: full-atom assembly — backbone coords from diffusion + S_phi side-chain
+    # global coords per committed design residue (empty dict if the cycle was off
+    # or nothing committed). Each entry: {restype3, atom_names, coords[k,3]}.
+    return {
+        "coordinate": x.squeeze(0),
+        "sequence": sampled,
+        "trajectory": trajectory,
+        "sidechain": sidechain_out,
+        "has_full_atom_sidechain": bool(sidechain_out),
+    }

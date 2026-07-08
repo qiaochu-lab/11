@@ -93,11 +93,18 @@ class DesignSourceDataset(Dataset):
     aa_mask_min_prob: float = 0.0
     aa_mask_max_prob: float = 1.0
     compute_sidechain: bool = False
+    backbone_only_binder: bool = False
     seed: int = 0
     _cropper: DesignCropper = field(init=False)
 
     def __post_init__(self) -> None:
         self._cropper = DesignCropper(crop_size=self.crop_size)
+        # P3: whenever S_phi is trained (compute_sidechain), B_theta must be
+        # backbone-only for the binder — otherwise a standard training entry
+        # point silently loses "binder side chains excluded from L_bb / scrubbed
+        # from the diffusion input". Couple the flags unless explicitly disabled.
+        if self.compute_sidechain and not self.backbone_only_binder:
+            self.backbone_only_binder = True
 
     def __len__(self) -> int:
         return len(self.provider)
@@ -128,6 +135,7 @@ class DesignSourceDataset(Dataset):
             aa_mask_min_prob=self.aa_mask_min_prob,
             aa_mask_max_prob=self.aa_mask_max_prob,
             compute_sidechain=self.compute_sidechain,
+            backbone_only_binder=self.backbone_only_binder,
             rng=rng,
         )
         new_feat, new_label, new_aa = DesignFeaturizer(selection).transform(

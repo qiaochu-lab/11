@@ -43,7 +43,11 @@ training_configs["residue_type"] = {
     #     if the clean-eval shows structure degradation. 0.0 = stop-grad (protect
     #     structure, no co-design coupling).
     "trunk_grad_scale": 1.0,
-    "internal_reduce": "mean",   # "mean" | "low_sigma" (pick least-noisy sample)
+    # `internal_reduce` now ONLY controls the single reduced representation that
+    # h_res / S_phi consume ("mean" | "low_sigma"). The AA LOSS is computed
+    # per-sample (per-sigma) and averaged — it does NOT reduce first, so this
+    # knob no longer affects the AA training target (it is an h_res/ablation knob).
+    "internal_reduce": "mean",
 }
 
 # EDM training noise sampler.
@@ -85,6 +89,38 @@ training_configs["loss"] = {
     "max_bin": 21.6875,
     "lddt_radius": 15.0,
     "align_before_mse": True,
+    # Side-chain terms (Stage II-A onwards). Previously these lived only as
+    # PXDesignLoss defaults and were NOT plumbed from config; now透传 (M5).
+    "weight_sc_local": 1.0,
+    "weight_sc_phys": 0.1,
+    # Post-refinement (Stage II-B cycle closure) term weights.
+    "weight_bb_post": 1.0,
+    "weight_aa_post": 1.0,
+}
+
+# Side-Chain Module knobs (consumed by ProtenixDesignTrain when
+# enable_sidechain=True). Kept off by default; finetune scripts opt in.
+training_configs["sidechain"] = {
+    "init_sigma": 1.0,
+    "c_atom": 128,
+    "trunk_grad_scale": 1.0,
+    "detach_feedback": False,
+    "route_by_type": False,
+    # Per-sigma alignment: feed S_phi a per-sigma h_res / aa_logits / sigma
+    # (flattened to [B*N_sample, L, C]) instead of a mean/low-sigma-reduced h_res.
+    # This is the intended joint-training main line. Stage II-A warmup may set
+    # this False to use the single reduced-h_res baseline (labeled as warmup).
+    "per_sigma": True,
+    # M1: exclude binder side-chain atoms from the backbone (L_bb) target so
+    # B_theta is backbone-only and S_phi is the sole side-chain generator.
+    "backbone_only_binder": True,
+    # M2: only emit/supervise the AA-refinement logits (post_aa) when the
+    # side-chain atom set is instantiated from PREDICTED type. Under GT-type
+    # teacher-forcing (the current default) GT atom composition would leak
+    # residue identity into post_aa via h_res', so we do NOT supervise it.
+    "predicted_mask": False,
+    "weight_bb_post": 1.0,
+    "weight_aa_post": 1.0,
 }
 
 # Two-stage curriculum (data source weights — to be consumed by the dataloader).

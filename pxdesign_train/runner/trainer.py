@@ -179,7 +179,14 @@ class PXDesignTrainer:
             lddt_radius=loss_cfg.lddt_radius,
             # On CPU the rigid-align uses CUDA autocast; disable in tests.
             align_before_mse=loss_cfg.align_before_mse and torch.cuda.is_available(),
+            # M5: side-chain loss weights透传 from config (previously stuck at
+            # PXDesignLoss defaults regardless of config).
+            weight_sc_local=float(getattr(loss_cfg, "weight_sc_local", 1.0)),
+            weight_sc_phys=float(getattr(loss_cfg, "weight_sc_phys", 0.1)),
         )
+        # Post-refinement weights are passed per-call in forward_loss.
+        self._weight_bb_post = float(getattr(loss_cfg, "weight_bb_post", 1.0))
+        self._weight_aa_post = float(getattr(loss_cfg, "weight_aa_post", 1.0))
 
     def _init_optimizer(self) -> None:
         cfg = self.configs.training
@@ -286,6 +293,9 @@ class PXDesignTrainer:
             post_pred_coordinate=out.get("post_pred_coordinate"),
             post_gt_coordinate_aug=out.get("post_gt_coordinate_aug"),
             post_aa_logits=out.get("post_aa_logits"),
+            weight_bb_post=getattr(self, "_weight_bb_post", 1.0),
+            weight_aa_post=getattr(self, "_weight_aa_post", 1.0),
+            backbone_atom_mask=batch["input_feature_dict"].get("backbone_loss_mask"),
         )
         return loss_out
 

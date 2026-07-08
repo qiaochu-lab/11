@@ -136,6 +136,17 @@ class ProtenixDesignTrain(ProtenixDesign):
             # Stage III routing: supervise coord loss only where predicted type
             # matches GT; mismatched residues fall back to physical loss.
             self.sc_route_by_type = bool(getattr(sc_cfg, "route_by_type", False)) if sc_cfg is not None else False
+            # M2: only emit a supervised AA-refinement head (post_aa_logits) when
+            # the side-chain atom set is instantiated from PREDICTED type. Under
+            # GT-type teacher-forcing, GT atom composition (atom names/counts)
+            # uniquely encodes residue identity and would leak through h_res' into
+            # post_aa_logits — an identity->identity shortcut. Default False keeps
+            # the leak closed by simply not supervising post_aa in that regime.
+            self.sc_predicted_mask = bool(getattr(sc_cfg, "predicted_mask", False)) if sc_cfg is not None else False
+            # Per-sigma alignment: S_phi reads per-sigma h_res/aa_logits/sigma
+            # (flattened [B*N_sample, L, C]) rather than a reduced h_res. Warmup
+            # can turn this off for the single-baseline path.
+            self.sc_per_sigma = bool(getattr(sc_cfg, "per_sigma", True)) if sc_cfg is not None else True
             sc_grad_scale = float(getattr(sc_cfg, "trunk_grad_scale", 1.0)) if sc_cfg is not None else 1.0
             c_atom = int(getattr(sc_cfg, "c_atom", 128)) if sc_cfg is not None else 128
             self.sidechain_module = SideChainModule(
@@ -225,6 +236,7 @@ class ProtenixDesignTrain(ProtenixDesign):
         if self.enable_residue_type_head:
             aa_t = input_feature_dict.get("aa_t")
             token_repr = s_inputs
+            a_full = None  # per-sample (per-sigma) representation, if available
             if self.aa_input_source == "diffusion_internal":
                 a = self._a_token_cache  # [..., N_sample, N_token, c_token]
                 if a is None:
@@ -233,27 +245,67 @@ class ProtenixDesignTrain(ProtenixDesign):
                         "diffusion_internal: a_token not captured; falling back to s_inputs"
                     )
                 else:
-                    token_repr = self._reduce_a_token(a, sigma).to(s_inputs.dtype)
                     # Gradient control: scale the AA gradient flowing into the
-                    # shared coord trunk (protects coordinates).
+                    # shared coord trunk (protects coordinates). Applied to BOTH
+                    # the reduced repr (for h_res/S_phi) and the per-sample repr
+                    # (for the AA loss).
                     g = self.aa_trunk_grad_scale
-                    if g != 1.0:
-                        token_repr = g * token_repr + (1.0 - g) * token_repr.detach()
+
+                    def _gscale(x):
+                        return x if g == 1.0 else g * x + (1.0 - g) * x.detach()
+
+                    # Reduced repr: what h_res / S_phi consume (one coherent
+                    # representation, mean or low-sigma per `internal_reduce`).
+                    token_repr = _gscale(self._reduce_a_token(a, sigma).to(s_inputs.dtype))
+                    # Per-sample repr: KEEP the N_sample axis so the AA loss is
+                    # computed per noise draw (per sigma) and averaged — no
+                    # reduce-then-predict blur, and it matches how cogenerate
+                    # queries the head across the sigma trajectory at inference.
+                    a_full = _gscale(a.to(s_inputs.dtype))
+                    # Per-sigma backbone state exposed for the side-chain / cycle
+                    # path: h_res_sigma [.., N_sample, N_token, C] aligns row-for-
+                    # row with out["sigma"] [.., N_sample] and out["aa_logits"].
+                    out["h_res_sigma"] = a_full
                     out["a_token_shape"] = torch.tensor(list(a.shape))
-            # The representation the AA head reads IS the h_res candidate:
-            # structure-aware a_token for diffusion_internal, s_inputs for the
-            # baseline. This is what a future h_res module should consume.
+            # The representation h_res / S_phi read (one coherent state). For the
+            # s_inputs baseline this is just s_inputs (no per-sample axis exists).
             out["h_res_candidate"] = token_repr
-            out["aa_logits"] = self.design_residue_type_head(token_repr, aa_t=aa_t)
+            # Reduced logits for S_phi / type routing (single [..., N_token, 20]).
+            out["aa_logits_reduced"] = self.design_residue_type_head(token_repr, aa_t=aa_t)
+            # AA-loss logits: per-sample under diffusion_internal ([..., N_sample,
+            # N_token, 20]); the reduced logits for the sigma-free s_inputs baseline.
+            out["aa_logits"] = (
+                self.design_residue_type_head(a_full, aa_t=aa_t)
+                if a_full is not None else out["aa_logits_reduced"]
+            )
 
         # 4. Side-Chain Module (Stage II-A): one-step local-frame decode + feedback.
         if self.enable_sidechain and "sc_atom_name_ids" in input_feature_dict:
-            h_res = out["h_res_candidate"]          # [N_token, c_res] or [B, N_token, c_res]
-            aa_logits = out["aa_logits"]            # matching leading dims
-            squeeze = h_res.dim() == 2              # batch=1 collapsed upstream
-            if squeeze:
-                h_res = h_res.unsqueeze(0)
-                aa_logits = aa_logits.unsqueeze(0)
+            # Per-sigma (Stage II-B main line) vs single reduced-h_res (warmup).
+            # In per-sigma mode each S_phi batch row corresponds to ONE specific
+            # sigma: we flatten [.., N_sample, L, C] -> [B*N_sample, L, C] and feed
+            # the matching per-sample aa_logits + real sigma. The per-token side-
+            # chain tensors (ids / mask / frames) are tiled to the flattened batch
+            # by the existing `expand(B, ...)` logic below. NOT a reduce/low-sigma
+            # mixed representation.
+            use_per_sigma = self.sc_per_sigma and out.get("h_res_sigma") is not None
+            sigma_flat = None
+            if use_per_sigma:
+                hs = out["h_res_sigma"]             # [.., N_sample, L, C]
+                al = out["aa_logits"]               # [.., N_sample, L, 20] (per-sigma)
+                L_, C_ = hs.shape[-2], hs.shape[-1]
+                h_res = hs.reshape(-1, L_, C_)       # [B*N_sample, L, C]
+                aa_logits = al.reshape(-1, L_, al.shape[-1])
+                sigma_flat = out["sigma"].reshape(-1)  # [B*N_sample], row-aligned
+                squeeze = False
+            else:
+                h_res = out["h_res_candidate"]      # [N_token, c_res] or [B, N_token, c_res]
+                # S_phi conditions on the REDUCED AA distribution (warmup baseline).
+                aa_logits = out["aa_logits_reduced"]
+                squeeze = h_res.dim() == 2          # batch=1 collapsed upstream
+                if squeeze:
+                    h_res = h_res.unsqueeze(0)
+                    aa_logits = aa_logits.unsqueeze(0)
             sc_ids = input_feature_dict["sc_atom_name_ids"]
             sc_mask = input_feature_dict["sc_atom_mask"]
             if sc_ids.dim() == 2:                   # add batch dim
@@ -268,7 +320,13 @@ class ProtenixDesignTrain(ProtenixDesign):
             noisy = gaussian_init_local(
                 sc_mask.detach().cpu(), sigma=self.sc_init_sigma
             ).to(h_res.device).to(h_res.dtype)
-            t = torch.ones(B, device=h_res.device)
+            # Sigma-embedding for S_phi's time input: the REAL per-sample noise
+            # level (EDM c_noise = 0.25*ln sigma) when per-sigma; a constant for
+            # the reduced warmup baseline (no single sigma to attach).
+            if sigma_flat is not None:
+                t = 0.25 * sigma_flat.to(h_res.device).clamp_min(1e-4).log()
+            else:
+                t = torch.ones(B, device=h_res.device)
             ca = input_feature_dict.get("sc_frame_t")
             if ca is not None:
                 ca = ca.to(h_res.device).float()
@@ -288,7 +346,22 @@ class ProtenixDesignTrain(ProtenixDesign):
                 h_res_prime = h_res_prime.squeeze(0)
             out["sc_pred_local"] = y0_local
             out["sc_atom_mask"] = sc_mask
-            out["h_res_prime"] = h_res_prime
+            out["h_res_prime"] = h_res_prime        # per-sigma [B*N_sample, L, C] when per-sigma
+            # Reduced h_res' for the cycle injection: the Protenix diffusion shares
+            # s_trunk across noise draws (no per-sample s_trunk), so per-sigma h_res'
+            # cannot be injected per-sigma without a submodule change. We average
+            # over the sigma axis for the injection (documented limitation); the
+            # per-sigma h_res' above is still available for other consumers.
+            if use_per_sigma:
+                n_sample = out["sigma"].shape[-1]
+                out["h_res_prime_reduced"] = (
+                    h_res_prime.reshape(-1, n_sample, h_res_prime.shape[-2], h_res_prime.shape[-1])
+                    .mean(dim=1)
+                )
+                if out["h_res_prime_reduced"].shape[0] == 1:
+                    out["h_res_prime_reduced"] = out["h_res_prime_reduced"].squeeze(0)
+            else:
+                out["h_res_prime_reduced"] = h_res_prime
 
             # Physical regularization (clash + contact) on predicted GLOBAL
             # side-chain coords: local -> global via the residue frames, then a
@@ -304,6 +377,12 @@ class ProtenixDesignTrain(ProtenixDesign):
                 if fR.dim() == 3:
                     fR, ft, bb = fR.unsqueeze(0), ft.unsqueeze(0), bb.unsqueeze(0)
                 B_, L_, A_ = y_l.shape[0], y_l.shape[1], y_l.shape[2]
+                # Broadcast per-token frames/backbone to the (possibly per-sigma)
+                # batch B_ so the reshape below is well-formed for B*N_sample rows.
+                if fR.shape[0] != B_:
+                    fR = fR.expand(B_, -1, -1, -1)
+                    ft = ft.expand(B_, -1, -1)
+                    bb = bb.expand(B_, -1, -1, -1)
                 y_g = to_global(y_l.float(), fR, ft)                     # [B,L,A,3]
                 m = sc_mask if sc_mask.dim() == 3 else sc_mask.unsqueeze(0)
                 phys = physical_loss(
@@ -325,8 +404,12 @@ class ProtenixDesignTrain(ProtenixDesign):
         # 5. Cycle closure (Stage II-B): reuse B_theta to refine backbone/type
         #    using the side-chain-informed h_res'. h_res' is injected into the
         #    (zero) token trunk s_trunk, then the backbone denoise is re-run.
-        if getattr(self, "enable_coevolution", False) and "h_res_prime" in out:
-            h_res_prime = out["h_res_prime"]
+        #    NOTE: s_trunk is sample-shared in the Protenix diffusion (the N_sample
+        #    axis is created inside the module), so we inject the sigma-REDUCED
+        #    h_res' here. True per-sigma feedback needs a per-sample s_trunk
+        #    (submodule change) — see README. post_aa stays gated (M2).
+        if getattr(self, "enable_coevolution", False) and "h_res_prime_reduced" in out:
+            h_res_prime = out["h_res_prime_reduced"]
             s_trunk_refine = s + self.hres_injector(h_res_prime).to(s.dtype)
             x_gt_aug_post, x_denoised_post, sigma_post = sample_diffusion_training(
                 noise_sampler=self.training_noise_sampler,
@@ -342,15 +425,30 @@ class ProtenixDesignTrain(ProtenixDesign):
             out["post_gt_coordinate_aug"] = x_gt_aug_post
             out["post_sigma"] = sigma_post
             # Refined AA logits from the side-chain-aware refinement pass.
-            if self.enable_residue_type_head:
+            # M2: ONLY when side chains were instantiated from predicted type.
+            # With GT-type teacher-forcing, h_res' carries GT atom composition,
+            # so supervising post_aa here would be an identity leak — skip it.
+            if self.enable_residue_type_head and not self.sc_predicted_mask:
+                if not getattr(self, "_warned_post_aa_skip", False):
+                    logging.getLogger(__name__).warning(
+                        "coevolution: post_aa_logits NOT emitted because "
+                        "sidechain.predicted_mask=False (GT atom composition would "
+                        "leak residue identity into the AA-refinement objective). "
+                        "Set sidechain.predicted_mask=True once S_phi instantiates "
+                        "the atom set from predicted type."
+                    )
+                    self._warned_post_aa_skip = True
+            if self.enable_residue_type_head and self.sc_predicted_mask:
                 a_post = self._a_token_cache
                 if a_post is not None:
-                    tok_post = self._reduce_a_token(a_post, sigma_post).to(s_inputs.dtype)
                     g = self.aa_trunk_grad_scale
+                    # Per-sample (per-sigma) refined logits, same treatment as the
+                    # primary AA loss; the loss averages over the N_sample axis.
+                    a_post = a_post.to(s_inputs.dtype)
                     if g != 1.0:
-                        tok_post = g * tok_post + (1.0 - g) * tok_post.detach()
+                        a_post = g * a_post + (1.0 - g) * a_post.detach()
                     out["post_aa_logits"] = self.design_residue_type_head(
-                        tok_post, aa_t=input_feature_dict.get("aa_t")
+                        a_post, aa_t=input_feature_dict.get("aa_t")
                     )
 
         return out

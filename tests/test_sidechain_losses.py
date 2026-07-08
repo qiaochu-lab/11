@@ -8,10 +8,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, "..")))
 
 from pxdesign_train.sidechain.losses import sidechain_local_loss
+import math
+
 from pxdesign_train.sidechain.physical import (
     bond_loss,
     angle_loss,
     clash_loss,
+    rotamer_loss,
+    contact_loss,
     physical_loss,
 )
 from pxdesign_train.sidechain.routing import route_sidechain_loss
@@ -66,6 +70,35 @@ def test_physical_terms_finite_and_backprop():
     for k in ("bond", "angle", "clash", "rotamer", "total"):
         assert torch.isfinite(out[k]).all()
     assert out["rotamer"].item() == 0.0  # stub
+    out["total"].backward()
+    assert torch.isfinite(coords.grad).all()
+
+
+def test_rotamer_prefers_staggered():
+    p0, p1, p2 = [0.0, 1, 0], [0.0, 0, 0], [1.0, 0, 0]
+    targets = torch.tensor([math.pi, math.pi / 3, -math.pi / 3])
+    idx = torch.tensor([[0, 1, 2, 3]])
+    cis = torch.tensor([[p0, p1, p2, [1.0, 1, 0]]])    # dihedral 0 (eclipsed)
+    trans = torch.tensor([[p0, p1, p2, [1.0, -1, 0]]])  # dihedral pi (== a target)
+    assert rotamer_loss(cis, idx, targets).item() > rotamer_loss(trans, idx, targets).item()
+
+
+def test_contact_penalizes_runaway():
+    bb = torch.zeros(1, 3, 3)
+    near = torch.tensor([[[1.0, 0, 0]]])
+    far = torch.tensor([[[50.0, 0, 0]]])
+    assert contact_loss(far, bb).item() > contact_loss(near, bb).item()
+
+
+def test_physical_contact_rotamer_present_and_backprop():
+    coords = torch.randn(1, 6, 3, requires_grad=True)
+    out = physical_loss(
+        coords, backbone_coords=torch.randn(1, 4, 3),
+        torsion_idx=torch.tensor([[0, 1, 2, 3]]),
+        rotamer_targets=torch.tensor([math.pi]),
+    )
+    for k in ("bond", "angle", "clash", "rotamer", "contact", "total"):
+        assert k in out and torch.isfinite(out[k]).all()
     out["total"].backward()
     assert torch.isfinite(coords.grad).all()
 

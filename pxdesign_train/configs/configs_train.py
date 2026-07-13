@@ -115,7 +115,23 @@ training_configs["sidechain"] = {
     # Gaussian is rotation-invariant, so pushing it through the predicted frame
     # F_hat carries no backbone-orientation information and S_phi cannot learn
     # where to place atoms in GLOBAL space. The (anisotropic) template does.
-    # False restores the old Gaussian init for A/B.
+    # Overleaf par.221 -- a SPEC requirement, not an engineering opinion, hence default ON:
+    #     y_T,ij = mu_ideal[a_i, j] + sigma_T * eps_ij ,   then   x_T,ij = F_hat_i . y_T,ij
+    # The appendix repeats it for inference ("side-chain atoms are initialized from
+    # residue-specific ideal templates around the predicted backbone frames"), and
+    # cogenerate honours it too.
+    #
+    # Yifei's code implements this equation with mu_ideal identically ZERO -- its init is
+    # gaussian_init_local(mask, sigma), whose signature never even receives the residue type,
+    # so it structurally cannot produce a residue-specific template. Two measured consequences:
+    #   1. NO ORIENTATION. An isotropic Gaussian is rotation-invariant (R.eps ~ eps), so
+    #      mapping it through F_hat carries no backbone orientation at all -- to_global
+    #      degenerates into a translation.
+    #   2. WRONG SCALE. At sigma=1.0 it packs every side-chain atom within ~1.6 A of CA,
+    #      while a real ARG reaches 6.6 A, LYS 6.3 A, TYR 6.3 A. That is not merely a weaker
+    #      prior, it is a physically impossible starting conformation.
+    # This is a spec/architecture gap, so we close it rather than leave it to a flag.
+    # Set False to reproduce Yifei's original Gaussian baseline for A/B.
     "template_init": True,
     # ABLATION CANDIDATE -- default OFF, i.e. Yifei's active path
     #     x0_global = MLP(atom_feats) + ca_coords          (CA-anchored global head)

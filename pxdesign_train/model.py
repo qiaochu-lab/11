@@ -201,8 +201,8 @@ class ProtenixDesignTrain(ProtenixDesign):
             # initialization encodes the backbone orientation; the old isotropic Gaussian
             # is rotation-invariant and encodes nothing. template_init=False restores it.
             self.sc_template_init = bool(getattr(sc_cfg, "template_init", True)) if sc_cfg is not None else True
-            self.sc_frame_aware_head = bool(getattr(sc_cfg, "frame_aware_head", True)) if sc_cfg is not None else True
-            self.sc_local_coord_input = bool(getattr(sc_cfg, "local_coord_input", True)) if sc_cfg is not None else True
+            self.sc_frame_aware_head = bool(getattr(sc_cfg, "frame_aware_head", False)) if sc_cfg is not None else False
+            self.sc_local_coord_input = bool(getattr(sc_cfg, "local_coord_input", False)) if sc_cfg is not None else False
             self.sc_init_sigma_T = float(getattr(sc_cfg, "init_sigma_T", DEFAULT_SIGMA_T)) if sc_cfg is not None else DEFAULT_SIGMA_T
             if self.sc_template_init and not templates_available():
                 logging.getLogger(__name__).warning(
@@ -889,7 +889,7 @@ class ProtenixDesignTrain(ProtenixDesign):
             # supervision. Detaching the frame here keeps the side-chain coord
             # objective from nudging the predicted backbone frame through the
             # initialization path.
-            if getattr(self, "sc_local_coord_input", True):
+            if getattr(self, "sc_local_coord_input", False):
                 # S_phi's OWN noisy side-chain atoms are fed in the residue-LOCAL frame.
                 # Feeding them as raw global coords adds t_CA (the residue's absolute
                 # position, tens of Angstrom, different per residue) on top of a ~4 A
@@ -907,7 +907,7 @@ class ProtenixDesignTrain(ProtenixDesign):
             # Frame-aware head (sidechain.frame_aware_head): hand S_phi the SAME stop-grad
             # rigid frame the target is built on, so it regresses rotation-invariant local
             # offsets and the known transform does the rotating. Output stays global.
-            _fa = getattr(self, "sc_frame_aware_head", True) and fR is not None and ft is not None
+            _fa = getattr(self, "sc_frame_aware_head", False) and fR is not None and ft is not None
 
             # ---- ATOM-level (q) feedback: give S_phi its 4 backbone context slots ----
             # FangWu's 14-slot picture: S_phi attends over ATOM14 = (N, CA, C, O) +

@@ -299,10 +299,10 @@ def cogenerate(
                 else:
                     sc_t = torch.ones(1, device=device)
                 # S_phi emits global side-chain coordinates. Its coordinate INPUT
-                # channel follows sidechain.local_coord_input (training default: the
-                # residue-LOCAL frame, translation-free); with the switch off we map
-                # the same init to global through F_hat, as training does.
-                if getattr(model, "sc_local_coord_input", True):
+                # channel follows sidechain.local_coord_input. With the default switch
+                # off, we map the same init to global through F_hat, as training does;
+                # turning it on feeds the residue-LOCAL frame, translation-free.
+                if getattr(model, "sc_local_coord_input", False):
                     noisy_in = noisy_local[None]
                 else:
                     noisy_in = to_global(
@@ -311,7 +311,7 @@ def cogenerate(
                 # Frame-aware head (sidechain.frame_aware_head): hand S_phi the same
                 # rigid frame training gives it, so it regresses local offsets and the
                 # known transform maps them to global. Output space stays global.
-                _fa = getattr(model, "sc_frame_aware_head", True)
+                _fa = getattr(model, "sc_frame_aware_head", False)
                 # ATOM-level channel (sidechain.q_direct): hand S_phi the residue's 4
                 # backbone atoms (N, CA, C, O) in its own LOCAL frame — the SAME 14-slot
                 # axis training builds, from the SAME source (the predicted backbone

@@ -253,7 +253,12 @@ def test_config_defaults():
     from pxdesign_train.configs.configs_train import training_configs
 
     sc = training_configs["sidechain"]
-    assert sc["template_init"] is True          # paragraph 221 on by default
+    # Overleaf par.221 specifies the template-anchored init as a FORMULA, not an option, and
+    # the appendix repeats it for inference. Yifei's code implements the same equation with
+    # mu_ideal == 0 (its init never even receives the residue type), which leaves the init
+    # both orientation-free and at the wrong scale. That is a spec gap, so the default closes
+    # it; False reproduces the original Gaussian baseline for A/B.
+    assert sc["template_init"] is True
     assert sc["init_sigma_T"] == DEFAULT_SIGMA_T
     assert sc["init_sigma"] == 1.0              # old Gaussian knob preserved for A/B
 

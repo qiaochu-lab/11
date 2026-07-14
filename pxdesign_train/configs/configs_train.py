@@ -172,19 +172,14 @@ training_configs["sidechain"] = {
     # ============================== STATUS: ENABLED ==============================
     # Overleaf par.221 specifies this as a FORMULA, and the 0714 appendix
     # ("Residue-Specific Side-Chain Template Construction") specifies how mu_ideal is
-    # actually built. Yifei's code (069645a) implements par.221's equation with
-    # mu_ideal == 0: its only initializer is gaussian_init_local(mask, sigma), whose
-    # signature never even receives the residue type, so it structurally cannot produce
-    # a residue-specific template.
+    # built. The old Gaussian initializer corresponds to mu_ideal == 0: it receives
+    # only the atom mask, so it cannot produce a residue-specific template.
     #
-    # THIS WAS OFF UNTIL 2026-07-14, waiting for one thing. In the 2026-07-09 meeting
-    # FangWu asked Jiaming to research how the ideal template should be built --
-    # "从统计分析上去做...还是说已经有一些比较成熟的方法" -- because the CCD table has the
-    # right bond lengths and angles but ONE ARBITRARY chi, which is 2-3 A from real side
-    # chains on the multi-chi residues. That research landed as the 0714 appendix:
-    # a mature method exists, namely a BACKBONE-DEPENDENT ROTAMER LIBRARY (Dunbrack
-    # BBDEP2010). It is now implemented, so the blocker is gone and the spec'd
-    # initialization is the default.
+    # The static CCD table has the right bond lengths and angles but one arbitrary
+    # chi, which is often far from real side chains on multi-chi residues. The 0714
+    # appendix selects a backbone-dependent rotamer library construction instead:
+    # Dunbrack BBDEP2010 provides chi conditioned on residue type and predicted
+    # backbone phi/psi. That provider is implemented and is the default.
     #
     # WHAT RUNS NOW (0714 appendix, Steps 1-3):
     #   Step 1  chi_constants.py   A_sc, K_i and G_ideal (connectivity, bond lengths/angles,
@@ -197,10 +192,10 @@ training_configs["sidechain"] = {
     #   model.py / cogenerate.py   x_T = F_hat y_T  (training and sampling mirror each other)
     #
     # Measured on 2790 residues of 33 real chains, mean local-frame distance of the
-    # initialization from the true side chain: 2.887 A (Gaussian, i.e. what runs today)
-    # -> 1.277 A (this). scripts/eval_template_quality.py regenerates the numbers.
+    # initialization from the true side chain: 2.887 A (Gaussian baseline) -> 1.277 A
+    # (dunbrack_mode). scripts/eval_template_quality.py regenerates the numbers.
     #
-    # Set to False to restore Yifei's isotropic Gaussian init (the A/B baseline).
+    # Set to False to restore the isotropic Gaussian A/B baseline.
     # ============================================================================
     "template_init": True,
     # Which mu_ideal construction to use:

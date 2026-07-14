@@ -86,7 +86,7 @@ def test_a_replacement_static_table_is_actually_used():
 
 # --- L2: a STOCHASTIC provider (sample a rotamer from a distribution) ---------
 def test_a_stochastic_provider_receives_the_generator():
-    """Jiaming's rotamer statistics give a DISTRIBUTION. For a generative model, sampling a
+    """Rotamer statistics give a DISTRIBUTION. For a generative model, sampling a
     rotamer is arguably more correct than always starting from the same canonical chi -- so
     the provider must be able to draw, reproducibly, from the caller's generator."""
     tix, mask = _chain()

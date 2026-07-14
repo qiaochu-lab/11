@@ -16,8 +16,7 @@ For every residue of every chain we take the real N/CA/C, build the same local f
 the model uses (``frames.build_frame``), express the real side-chain heavy atoms in it,
 and compare against each construction:
 
-  gaussian      mu = 0                     Yifei's isotropic init (069645a). The
-                                           reference point: what the model does today.
+  gaussian      mu = 0                     isotropic baseline.
   ccd           static CCD conformer       one arbitrary chi per residue type (pre-0714)
   dunbrack_mode BuildSC, chi = argmax p    0714 appendix, deterministic selection
   dunbrack      BuildSC, chi ~ Cat(p)      0714 appendix, sampled selection (the default);
@@ -202,7 +201,7 @@ def main() -> int:
         samp_chi1.append(chi_s[:, 0])
 
     methods = {
-        "gaussian  (mu=0, Yifei 069645a)": (rmsd(torch.zeros_like(mu_true), mu_true, mask), None),
+        "gaussian  (mu=0, isotropic)": (rmsd(torch.zeros_like(mu_true), mu_true, mask), None),
         "ccd       (static, pre-0714)": (rmsd(mu_ccd, mu_true, mask), chi_from_local(tix, mu_ccd)[:, 0]),
         "dunbrack_mode (0714, argmax p)": (rmsd(mu_mode, mu_true, mask), chi_mode[:, 0]),
         "dunbrack  (0714, sampled)": (torch.stack(samp_rmsd).mean(0), None),
@@ -233,7 +232,7 @@ def main() -> int:
     print(f"\n{'res':4s} {'n':>5s}  {'gaussian':>9s} {'ccd':>9s} {'db_mode':>9s} {'db_samp':>9s} "
           f"{'oracle':>9s}   {'mode vs ccd':>12s} {'samp vs ccd':>12s}")
     print("-" * 96)
-    r_g, r_c = methods["gaussian  (mu=0, Yifei 069645a)"][0], methods["ccd       (static, pre-0714)"][0]
+    r_g, r_c = methods["gaussian  (mu=0, isotropic)"][0], methods["ccd       (static, pre-0714)"][0]
     r_m = methods["dunbrack_mode (0714, argmax p)"][0]
     r_d = methods["dunbrack  (0714, sampled)"][0]
     r_o = methods["oracle    (true chi; lower bound)"][0]

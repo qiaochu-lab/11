@@ -31,7 +31,7 @@
 | [**ProtDBench**](https://github.com/congliuUvA/ProtDBench) | **evaluation framework** | 同一批设计同时按多档、多验证器打分 | AF2-IG / ColabFold / Protenix / Boltz / Chai-1 / ESMFold | Direct |
 | [**BindCraft**](https://github.com/martinpacesa/BindCraft) | method | 幻觉式 binder 设计，**使用自己的 panel** | AF2-multimer 设计 + 单体重预测；有湿实验 | Adapter |
 
-> 讲解：这一类问的就是"给定靶点能不能造出结合物"，产物形态和我们在做的事最接近。**只有 AlphaProteo、PXDesign、A-CODE、ProtDBench 共用 AlphaProteo 那个 10-target panel；BindCraft 不用这十个靶点，有自己的一套。** ProtDBench 特殊的地方是它不出新方法，而是把同一批设计同时交给多个验证器打分，所以它是我们最容易对齐的参照。
+这一类问的就是"给定靶点能不能造出结合物"，产物形态和我们在做的事最接近。**只有 AlphaProteo、PXDesign、A-CODE、ProtDBench 共用 AlphaProteo 那个 10-target panel；BindCraft 不用这十个靶点，有自己的一套。** ProtDBench 特殊的地方是它不出新方法，而是把同一批设计同时交给多个验证器打分，所以它是我们最容易对齐的参照。
 
 ### motif scaffolding
 
@@ -41,7 +41,7 @@
 | [**RFdiffusion motif 集**](https://github.com/RosettaCommons/RFdiffusion) | protocol | 这一类的原始题面，被后续直接继承 | ProteinMPNN + AF2 | Adapter |
 | [**La-Proteina**](https://github.com/NVIDIA-BioNeMo/la-proteina) | protocol | **全原子** motif（含侧链原子） | all-atom co-designability | Adapter |
 
-> 讲解：这一类问的是"给一个功能位点，能不能长出撑住它的支架"。前两个判的是骨架自洽——序列重折回来像不像；La-Proteina 把侧链原子也算进去，是**本轮核实候选中最直接评估 all-atom co-designability 的代表工作**。对我们的意义就在这个差别上：前两者测不到全原子那一部分。
+这一类问的是"给一个功能位点，能不能长出撑住它的支架"。前两个判的是骨架自洽——序列重折回来像不像；La-Proteina 把侧链原子也算进去，是**本轮核实候选中最直接评估 all-atom co-designability 的代表工作**。对我们的意义就在这个差别上：前两者测不到全原子那一部分。
 
 ### enzyme / ligand
 
@@ -51,7 +51,7 @@
 | **four-ligand convention**（SAM / OQO / FAD / IAI） | **convention**，非 benchmark | 配体条件生成，事实上的共同测试分子 | 各家验证器与样本数都不同 | Future |
 | [**DISCO / Studio-179**](https://arxiv.org/abs/2604.05181) | benchmark | 大规模配体条件生成 | Chai-1 + 配体位姿合法性检查 | Future |
 
-> 讲解：这一类的门槛是模型得看得懂配体。AME 有固定题面和明确判据，所以跨论文能比；four-ligand 只是大家默认用同几个分子，各家验证器都不一样，数字**没法**横比。对我们全是 Future，而且卡的不是接口不顺，是还没有配体条件化这个能力。
+这一类的门槛是模型得看得懂配体。AME 有固定题面和明确判据，所以跨论文能比；four-ligand 只是大家默认用同几个分子，各家验证器都不一样，数字**没法**横比。对我们全是 Future，而且卡的不是接口不顺，是还没有配体条件化这个能力。
 
 ### peptide
 
@@ -60,7 +60,7 @@
 | [**PepGLAD / PepBench**](https://github.com/THUNLP-MT/PepGLAD) | benchmark（固定划分） | 天然肽–受体复合物的**重建** | 无结构预测器，直接对晶体肽比 | Adapter |
 | **RFpeptides** | protocol | **大环肽** de novo 设计 | 环状 AF2 + Rosetta；有湿实验 | Future |
 
-> 讲解：这一类实际是两件事。PepGLAD 是重建天然复合物，有真值肽，可以直接量全原子差多少——这是 binder 线给不了的证据，代价是它测的是"能否复现已知答案"。RFpeptides 是大环从头设计，需要环状位置编码，属于另一种能力。
+这一类实际是两件事。PepGLAD 是重建天然复合物，有真值肽，可以直接量全原子差多少——这是 binder 线给不了的证据，代价是它测的是"能否复现已知答案"。RFpeptides 是大环从头设计，需要环状位置编码，属于另一种能力。
 
 ### antibody / nanobody
 
@@ -70,7 +70,7 @@
 | [**CHIMERA-Bench**](https://arxiv.org/abs/2603.13431) | **benchmark + leaderboard** | 表位条件下的 CDR 序列–结构共设计 | 对天然结构：AAR、DockQ、表位 F1 | Future |
 | **AIntibody**（Nat Biotechnol） | **社区盲测挑战** | 多机构 AI 设计抗体的前瞻性对比 | 真做实验 | — |
 
-> 讲解：**本轮核实的主流 benchmark 以 framework-conditioned CDR redesign 为主**——framework 给定，只改 CDR。RAbD 是大家都在用的那批案例，CHIMERA 自建了更大的集合还带排行榜，AIntibody 是真做实验的盲测挑战。对我们是 Future，缺的是 framework 残基级固定和 CDR mask；另外抗体与纳米抗体不共用协议，纳米抗体没有轻链，流程结构本身就不同。
+**本轮核实的主流 benchmark 以 framework-conditioned CDR redesign 为主**——framework 给定，只改 CDR。RAbD 是大家都在用的那批案例，CHIMERA 自建了更大的集合还带排行榜，AIntibody 是真做实验的盲测挑战。对我们是 Future，缺的是 framework 残基级固定和 CDR mask；另外抗体与纳米抗体不共用协议，纳米抗体没有轻链，流程结构本身就不同。
 
 ---
 

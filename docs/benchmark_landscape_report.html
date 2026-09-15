@@ -25,18 +25,13 @@ th{background:var(--head);font-weight:600;white-space:nowrap}
 tbody tr:nth-child(even){background:var(--zebra)}
 .sub{color:var(--muted);font-size:12px;margin:0 0 18px}
 .fine{color:#70757c;font-size:11px;margin:6px 0}
-.note{background:#f4f4f5;border-left:3px solid #b4b8be;color:#3a3a3a;
- font-size:12px;line-height:1.62;padding:8px 12px;margin:8px 0 18px}
-.note::before{content:"讲解";display:block;font-size:9.5px;
- letter-spacing:.1em;color:#8a8f96;margin-bottom:3px}
 @media print{
  body{font-size:10.5px}.page{max-width:none;padding:0}
  h2{page-break-after:avoid}h3{page-break-after:avoid}
  .tw,table,blockquote{page-break-inside:avoid}
  table{font-size:9px}th,td{padding:3px 4px}
  a{color:var(--fg);border:0}
- .note{background:#f2f2f3;border-left:2.5px solid #9aa0a6;font-size:9.5px;padding:5px 8px;margin:5px 0 11px}
- .note::before{font-size:8px}.fine{font-size:8.5px}
+ .fine{font-size:8.5px}
  @page{margin:14mm 10mm}
 }
 </style></head><body><div class='page'><h1>Protein design evaluation：benchmark landscape</h1>
@@ -62,34 +57,34 @@ tbody tr:nth-child(even){background:var(--zebra)}
 <tr><td style='text-align:left'><a href="https://github.com/congliuUvA/ProtDBench"><strong>ProtDBench</strong></a></td><td style='text-align:left'><strong>evaluation framework</strong></td><td style='text-align:left'>同一批设计同时按多档、多验证器打分</td><td style='text-align:left'>AF2-IG / ColabFold / Protenix / Boltz / Chai-1 / ESMFold</td><td style='text-align:left'>Direct</td></tr>
 <tr><td style='text-align:left'><a href="https://github.com/martinpacesa/BindCraft"><strong>BindCraft</strong></a></td><td style='text-align:left'>method</td><td style='text-align:left'>幻觉式 binder 设计，<strong>使用自己的 panel</strong></td><td style='text-align:left'>AF2-multimer 设计 + 单体重预测；有湿实验</td><td style='text-align:left'>Adapter</td></tr>
 </tbody></table></div>
-<div class='note'>这一类问的就是"给定靶点能不能造出结合物"，产物形态和我们在做的事最接近。<strong>只有 AlphaProteo、PXDesign、A-CODE、ProtDBench 共用 AlphaProteo 那个 10-target panel；BindCraft 不用这十个靶点，有自己的一套。</strong> ProtDBench 特殊的地方是它不出新方法，而是把同一批设计同时交给多个验证器打分，所以它是我们最容易对齐的参照。</div>
+<p>这一类问的就是"给定靶点能不能造出结合物"，产物形态和我们在做的事最接近。<strong>只有 AlphaProteo、PXDesign、A-CODE、ProtDBench 共用 AlphaProteo 那个 10-target panel；BindCraft 不用这十个靶点，有自己的一套。</strong> ProtDBench 特殊的地方是它不出新方法，而是把同一批设计同时交给多个验证器打分，所以它是我们最容易对齐的参照。</p>
 <h3>motif scaffolding</h3>
 <div class='tw'><table><thead><tr><th style='text-align:left'>Work</th><th style='text-align:left'>类型</th><th style='text-align:left'>在考什么</th><th style='text-align:left'>怎么评</th><th style='text-align:left'>interface</th></tr></thead><tbody>
 <tr><td style='text-align:left'><a href="https://arxiv.org/abs/2502.12479"><strong>MotifBench</strong></a></td><td style='text-align:left'><strong>benchmark</strong></td><td style='text-align:left'>固定题面上的 motif 支架能力</td><td style='text-align:left'>ProteinMPNN → ESMFold；Foldseek 查唯一解</td><td style='text-align:left'>Adapter</td></tr>
 <tr><td style='text-align:left'><a href="https://github.com/RosettaCommons/RFdiffusion"><strong>RFdiffusion motif 集</strong></a></td><td style='text-align:left'>protocol</td><td style='text-align:left'>这一类的原始题面，被后续直接继承</td><td style='text-align:left'>ProteinMPNN + AF2</td><td style='text-align:left'>Adapter</td></tr>
 <tr><td style='text-align:left'><a href="https://github.com/NVIDIA-BioNeMo/la-proteina"><strong>La-Proteina</strong></a></td><td style='text-align:left'>protocol</td><td style='text-align:left'><strong>全原子</strong> motif（含侧链原子）</td><td style='text-align:left'>all-atom co-designability</td><td style='text-align:left'>Adapter</td></tr>
 </tbody></table></div>
-<div class='note'>这一类问的是"给一个功能位点，能不能长出撑住它的支架"。前两个判的是骨架自洽——序列重折回来像不像；La-Proteina 把侧链原子也算进去，是<strong>本轮核实候选中最直接评估 all-atom co-designability 的代表工作</strong>。对我们的意义就在这个差别上：前两者测不到全原子那一部分。</div>
+<p>这一类问的是"给一个功能位点，能不能长出撑住它的支架"。前两个判的是骨架自洽——序列重折回来像不像；La-Proteina 把侧链原子也算进去，是<strong>本轮核实候选中最直接评估 all-atom co-designability 的代表工作</strong>。对我们的意义就在这个差别上：前两者测不到全原子那一部分。</p>
 <h3>enzyme / ligand</h3>
 <div class='tw'><table><thead><tr><th style='text-align:left'>Work</th><th style='text-align:left'>类型</th><th style='text-align:left'>在考什么</th><th style='text-align:left'>怎么评</th><th style='text-align:left'>interface</th></tr></thead><tbody>
 <tr><td style='text-align:left'><a href="https://github.com/RosettaCommons/RFdiffusion2"><strong>AME</strong></a></td><td style='text-align:left'><strong>benchmark</strong></td><td style='text-align:left'>催化位点支架：能否摆对催化残基并容纳配体</td><td style='text-align:left'>LigandMPNN → Chai-1；催化重原子 RMSD + 配体撞车</td><td style='text-align:left'>Future</td></tr>
 <tr><td style='text-align:left'><strong>four-ligand convention</strong>（SAM / OQO / FAD / IAI）</td><td style='text-align:left'><strong>convention</strong>，非 benchmark</td><td style='text-align:left'>配体条件生成，事实上的共同测试分子</td><td style='text-align:left'>各家验证器与样本数都不同</td><td style='text-align:left'>Future</td></tr>
 <tr><td style='text-align:left'><a href="https://arxiv.org/abs/2604.05181"><strong>DISCO / Studio-179</strong></a></td><td style='text-align:left'>benchmark</td><td style='text-align:left'>大规模配体条件生成</td><td style='text-align:left'>Chai-1 + 配体位姿合法性检查</td><td style='text-align:left'>Future</td></tr>
 </tbody></table></div>
-<div class='note'>这一类的门槛是模型得看得懂配体。AME 有固定题面和明确判据，所以跨论文能比；four-ligand 只是大家默认用同几个分子，各家验证器都不一样，数字<strong>没法</strong>横比。对我们全是 Future，而且卡的不是接口不顺，是还没有配体条件化这个能力。</div>
+<p>这一类的门槛是模型得看得懂配体。AME 有固定题面和明确判据，所以跨论文能比；four-ligand 只是大家默认用同几个分子，各家验证器都不一样，数字<strong>没法</strong>横比。对我们全是 Future，而且卡的不是接口不顺，是还没有配体条件化这个能力。</p>
 <h3>peptide</h3>
 <div class='tw'><table><thead><tr><th style='text-align:left'>Work</th><th style='text-align:left'>类型</th><th style='text-align:left'>在考什么</th><th style='text-align:left'>怎么评</th><th style='text-align:left'>interface</th></tr></thead><tbody>
 <tr><td style='text-align:left'><a href="https://github.com/THUNLP-MT/PepGLAD"><strong>PepGLAD / PepBench</strong></a></td><td style='text-align:left'>benchmark（固定划分）</td><td style='text-align:left'>天然肽–受体复合物的<strong>重建</strong></td><td style='text-align:left'>无结构预测器，直接对晶体肽比</td><td style='text-align:left'>Adapter</td></tr>
 <tr><td style='text-align:left'><strong>RFpeptides</strong></td><td style='text-align:left'>protocol</td><td style='text-align:left'><strong>大环肽</strong> de novo 设计</td><td style='text-align:left'>环状 AF2 + Rosetta；有湿实验</td><td style='text-align:left'>Future</td></tr>
 </tbody></table></div>
-<div class='note'>这一类实际是两件事。PepGLAD 是重建天然复合物，有真值肽，可以直接量全原子差多少——这是 binder 线给不了的证据，代价是它测的是"能否复现已知答案"。RFpeptides 是大环从头设计，需要环状位置编码，属于另一种能力。</div>
+<p>这一类实际是两件事。PepGLAD 是重建天然复合物，有真值肽，可以直接量全原子差多少——这是 binder 线给不了的证据，代价是它测的是"能否复现已知答案"。RFpeptides 是大环从头设计，需要环状位置编码，属于另一种能力。</p>
 <h3>antibody / nanobody</h3>
 <div class='tw'><table><thead><tr><th style='text-align:left'>Work</th><th style='text-align:left'>类型</th><th style='text-align:left'>在考什么</th><th style='text-align:left'>怎么评</th><th style='text-align:left'>interface</th></tr></thead><tbody>
 <tr><td style='text-align:left'><a href="https://github.com/THUNLP-MT/dyMEAN"><strong>RAbD</strong></a></td><td style='text-align:left'><strong>事实标准案例集</strong></td><td style='text-align:left'>给定 framework 的 CDR 重设计</td><td style='text-align:left'>Rosetta 能量、序列恢复率；只排名</td><td style='text-align:left'>Future</td></tr>
 <tr><td style='text-align:left'><a href="https://arxiv.org/abs/2603.13431"><strong>CHIMERA-Bench</strong></a></td><td style='text-align:left'><strong>benchmark + leaderboard</strong></td><td style='text-align:left'>表位条件下的 CDR 序列–结构共设计</td><td style='text-align:left'>对天然结构：AAR、DockQ、表位 F1</td><td style='text-align:left'>Future</td></tr>
 <tr><td style='text-align:left'><strong>AIntibody</strong>（Nat Biotechnol）</td><td style='text-align:left'><strong>社区盲测挑战</strong></td><td style='text-align:left'>多机构 AI 设计抗体的前瞻性对比</td><td style='text-align:left'>真做实验</td><td style='text-align:left'>—</td></tr>
 </tbody></table></div>
-<div class='note'><strong>本轮核实的主流 benchmark 以 framework-conditioned CDR redesign 为主</strong>——framework 给定，只改 CDR。RAbD 是大家都在用的那批案例，CHIMERA 自建了更大的集合还带排行榜，AIntibody 是真做实验的盲测挑战。对我们是 Future，缺的是 framework 残基级固定和 CDR mask；另外抗体与纳米抗体不共用协议，纳米抗体没有轻链，流程结构本身就不同。</div>
+<p><strong>本轮核实的主流 benchmark 以 framework-conditioned CDR redesign 为主</strong>——framework 给定，只改 CDR。RAbD 是大家都在用的那批案例，CHIMERA 自建了更大的集合还带排行榜，AIntibody 是真做实验的盲测挑战。对我们是 Future，缺的是 framework 残基级固定和 CDR mask；另外抗体与纳米抗体不共用协议，纳米抗体没有轻链，流程结构本身就不同。</p>
 <hr>
 <h2>三、五条 survey findings</h2>
 <p><strong>1. fixed benchmark ≠ widely reused convention。</strong> 复用最广的往往不是最标准化的。酶线的 four-ligand 用得最多，却没有清单、各家验证器不同，数字没法横比；AME 反过来，题面固定判据明确，复用面窄一些但能跨论文比。</p>

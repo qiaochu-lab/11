@@ -50,7 +50,7 @@ tbody tr:nth-child(even){background:var(--zebra)}
 <h2>二、各 family 的代表工作</h2>
 <h3>binder / miniprotein</h3>
 <div class='tw'><table><thead><tr><th style='text-align:left'>Work</th><th style='text-align:left'>Test set / setting</th><th style='text-align:left'>Evaluation pipeline</th><th style='text-align:left'>Core metrics</th><th style='text-align:left'>Key point</th></tr></thead><tbody>
-<tr><td style='text-align:left'><a href="https://arxiv.org/abs/2409.08022"><strong>AlphaProteo</strong></a></td><td style='text-align:left'>提出 10-target panel，其中 8 个做过湿实验</td><td style='text-align:left'>AF2 类重折 + 湿实验验证</td><td style='text-align:left'>pLDDT、ipTM、ipAE、bound-unbound RMSD</td><td style='text-align:left'>这个 panel 的来源，被后续反复复用</td></tr>
+<tr><td style='text-align:left'><a href="https://arxiv.org/abs/2409.08022"><strong>AlphaProteo</strong></a></td><td style='text-align:left'>提出 10-target panel，其中 8 个做过湿实验</td><td style='text-align:left'>AF2 类重折 + 湿实验验证</td><td style='text-align:left'>AF2 confidence / interface metrics；wet-lab binding</td><td style='text-align:left'>这个 panel 的来源，被后续反复复用</td></tr>
 <tr><td style='text-align:left'><a href="https://github.com/bytedance/PXDesignBench"><strong>PXDesign</strong></a></td><td style='text-align:left'>同一 10-target panel（另有环肽档）</td><td style='text-align:left'>AF2-IG + Protenix 重折</td><td style='text-align:left'>pLDDT、ipAE、binder RMSD；iptm_binder、ptm_binder</td><td style='text-align:left'>method 与 evaluation framework 合一</td></tr>
 <tr><td style='text-align:left'><a href="https://arxiv.org/abs/2605.03360"><strong>A-CODE</strong></a></td><td style='text-align:left'>同一 10-target panel</td><td style='text-align:left'>AF2-IG，单一判定档</td><td style='text-align:left'>pLDDT、ipTM、ipAE、bound-unbound RMSD</td><td style='text-align:left'>全原子一步 co-design；单验证器单档</td></tr>
 <tr><td style='text-align:left'><a href="https://github.com/congliuUvA/ProtDBench"><strong>ProtDBench</strong></a></td><td style='text-align:left'>同一 panel + Cao 靶点；另带 Cao 湿实验打分表</td><td style='text-align:left'>同一批设计并行喂给 AF2-IG / ColabFold / Protenix(-Mini) / Boltz / Chai-1 / ESMFold，多档并判；TMalign 聚类</td><td style='text-align:left'>上述全部 + unscaled ipAE；簇级成功率</td><td style='text-align:left'><strong>multi-verifier</strong>：换验证器与换档的影响可直接读出来</td></tr>
@@ -74,7 +74,7 @@ tbody tr:nth-child(even){background:var(--zebra)}
 <h3>peptide</h3>
 <div class='tw'><table><thead><tr><th style='text-align:left'>Work</th><th style='text-align:left'>Test set / setting</th><th style='text-align:left'>Evaluation pipeline</th><th style='text-align:left'>Core metrics</th><th style='text-align:left'>Key point</th></tr></thead><tbody>
 <tr><td style='text-align:left'><a href="https://github.com/THUNLP-MT/PepGLAD"><strong>PepGLAD / PepBench</strong></a></td><td style='text-align:left'>固定划分：PepBDB 划分随仓库，LNR 在 Zenodo；任务是天然肽–受体复合物<strong>重建</strong></td><td style='text-align:left'>无结构预测器，直接对晶体肽比 + PyRosetta</td><td style='text-align:left'>Cα RMSD、AAR、Rosetta ΔG</td><td style='text-align:left'><strong>fixed split + 有真值肽</strong>，可直接量全原子差异</td></tr>
-<tr><td style='text-align:left'><strong>RFpeptides</strong></td><td style='text-align:left'>4 个靶点的自有面板，<strong>大环肽</strong> de novo</td><td style='text-align:left'>环状 AF2（AfCycDesign）+ Rosetta；湿实验</td><td style='text-align:left'>AfCycDesign 置信度、Rosetta 界面能量</td><td style='text-align:left'>大环 de novo + <strong>wet-lab</strong></td></tr>
+<tr><td style='text-align:left'><strong>RFpeptides</strong></td><td style='text-align:left'>4 个靶点的自有面板，<strong>大环肽</strong> de novo</td><td style='text-align:left'>环状 AF2（AfCycDesign）+ Rosetta；湿实验</td><td style='text-align:left'>iPAE、Cα RMSD、Rosetta interface metrics</td><td style='text-align:left'>大环 de novo + <strong>wet-lab</strong></td></tr>
 </tbody></table></div>
 <p>这一类实际是两件事。PepGLAD 是重建天然复合物，有真值肽，可以直接量全原子差多少——这是 binder 线给不了的证据，代价是它测的是"能否复现已知答案"。RFpeptides 是大环从头设计，前置条件是环状拓扑表示，属于另一种能力。</p>
 <h3>antibody / nanobody</h3>
@@ -88,8 +88,8 @@ tbody tr:nth-child(even){background:var(--zebra)}
 <h2>三、五条 survey findings</h2>
 <p><strong>1. fixed benchmark ≠ widely reused convention。</strong> 复用最广的往往不是最标准化的。酶线的 four-ligand 用得最多，却没有清单、各家验证器不同，数字没法横比；AME 反过来，题面固定判据明确，复用面窄一些但能跨论文比。</p>
 <p><strong>2. wet-lab strong ≠ reproducible benchmark。</strong> 湿实验强和能复跑经常是两回事。实验最硬的那几项（商业模型、盲测挑战）恰恰拿不到可复跑的 artifacts，而 artifacts 最规范的几个又没有湿实验。所以"这个 benchmark 可信吗"得拆成两个问题分别问。</p>
-<p><strong>3. shared panel ≠ shared ecosystem。</strong> AlphaProteo 提供被复用的 10-target panel；PXDesign / A-CODE / ProtDBench 之间作者和生态重叠，因此<strong>后三者不能视为完全独立的外部验证，但 direct baseline comparability 很高</strong>。要补独立性，得换验证器族或换标签源。</p>
-<p><strong>4. 换 verifier 会显著改变 success rate。</strong> 常用的 AF2-IG verifier 放在八个打分器里只排第 6。同一批设计换一个判定档，有的靶点成功率差两个数量级，有的几乎不动。所以报成功率必须说清用的是哪个验证器、哪一档。</p>
+<p><strong>3. shared panel ≠ shared ecosystem。</strong> AlphaProteo 提供被复用的 10-target panel；PXDesign / A-CODE / ProtDBench 之间作者和生态重叠，因此<strong>后三者不能视为完全独立的外部验证，但 direct baseline comparability 很高</strong>。要补外部独立证据，需要独立团队或独立实验 / 标签源；换 verifier family 可以检验 robustness，但本身不等于 independent validation。</p>
+<p><strong>4. 换 verifier 会显著改变 success rate。</strong> 在 ProtDBench 的 Cao wet-lab calibration set 上，AF2-IG 的 ipAE 在 8 个 verifier 中排第 6。同一批设计换一个判定档，有的靶点成功率差两个数量级，有的几乎不动。所以 verifier choice 本身会显著影响 benchmark conclusion——报成功率必须说清用的是哪个验证器、哪一档。</p>
 <p><strong>5. 不同 task 的 conditioning requirement 不同。</strong> 六类任务要求的条件化输入完全不是一回事：binder 和 motif 给的是结构坐标，peptide 重建给受体，enzyme 要能读配体或 EC 号，antibody 要能在残基级固定 framework 再只放开 CDR，大环肽还要环状拓扑表示。所以"支持条件生成"不是一个开关——判断一个模型能上哪些 benchmark，得按 conditioning 的类型逐个看。</p>
 <hr>
 <p class='fine'>完整 inventory、逐条源码核对与 unresolved 清单见 <code>design_eval_summary.md</code> 与 <code>design_eval_landscape.md</code>。</p></div></body></html>

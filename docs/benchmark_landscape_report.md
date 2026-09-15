@@ -28,7 +28,8 @@
 | [**A-CODE**](https://arxiv.org/abs/2605.03360) | 同一 10-target panel | AF2-IG，单一判定档 | pLDDT、ipTM、ipAE、bound-unbound RMSD | 全原子一步 co-design；单验证器单档 |
 | [**ProtDBench**](https://github.com/congliuUvA/ProtDBench) | 同一 panel + Cao 靶点；另带 Cao 湿实验打分表 | 同一批设计并行喂给 AF2-IG / ColabFold / Protenix(-Mini) / Boltz / Chai-1 / ESMFold，多档并判；TMalign 聚类 | 上述全部 + unscaled ipAE；簇级成功率 | **multi-verifier**：换验证器与换档的影响可直接读出来 |
 | [**BindCraft**](https://github.com/martinpacesa/BindCraft) | **自有 panel**，不用上面那十个靶点 | AF2-multimer 设计环 → AF2 单体重预测；湿实验 | pLDDT、ipTM、ipAE、bound-unbound RMSD | 自成一套 panel + wet-lab |
-这一类问的就是"给定靶点能不能造出结合物"，产物形态和我们在做的事最接近。**只有 AlphaProteo、PXDesign、A-CODE、ProtDBench 共用 AlphaProteo 那个 10-target panel；BindCraft 不用这十个靶点，有自己的一套。** ProtDBench 特殊的地方是它不出新方法，而是把同一批设计同时交给多个验证器打分，所以它是我们最容易对齐的参照。
+
+该类任务的产物形态与全原子 co-design 最为接近。**AlphaProteo、PXDesign、A-CODE、ProtDBench 共用 AlphaProteo 的 10-target panel；BindCraft 使用自有 panel。** ProtDBench 不提出新方法，而是将同一批设计并行提交给多个验证器与多个判定档，因此是唯一可直接读出 verifier 选择与档位影响的条目。
 
 ### motif scaffolding
 
@@ -37,7 +38,8 @@
 | [**MotifBench**](https://arxiv.org/abs/2502.12479) | 30 题固定题面 | ProteinMPNN → ESMFold → Kabsch 对齐；Foldseek 查唯一解 | motif RMSD、scRMSD；唯一成功解计数、novelty | **fixed benchmark**，有独立维护方与排行榜 |
 | [**RFdiffusion motif 集**](https://github.com/RosettaCommons/RFdiffusion) | 25 题，这一类的原始题面 | ProteinMPNN → AF2 | motif RMSD、scRMSD | **widely reused**：后续题面多由它派生 |
 | [**La-Proteina**](https://github.com/NVIDIA-BioNeMo/la-proteina) | 26 个全原子 motif 任务（含侧链原子） | 模型自产序列 → 全原子自洽比对 | 全原子 RMSD（含侧链）、motif RMSD | **all-atom**：侧链也算进判据 |
-这一类问的是"给一个功能位点，能不能长出撑住它的支架"。前两个判的是骨架自洽——序列重折回来像不像；La-Proteina 把侧链原子也算进去，是**本轮核实候选中最直接评估 all-atom co-designability 的代表工作**。对我们的意义就在这个差别上：前两者测不到全原子那一部分。
+
+前两者判定骨架层面的自洽性，即重折序列与目标骨架的偏差；La-Proteina 将侧链原子纳入判据，是**本轮核实候选中最直接评估 all-atom co-designability 的代表工作**。三者题面部分重叠但判据层级不同，成功率不可直接比较。
 
 ### enzyme / ligand
 
@@ -46,7 +48,8 @@
 | [**AME**](https://github.com/RosettaCommons/RFdiffusion2) | 41 个活性位点（M-CSA × PARITY） | LigandMPNN 出序列 → Chai-1 折叠 → 催化位点比对 + 配体检查 | 催化重原子 RMSD、配体撞车检查 | **fixed benchmark**：酶线唯一跨论文可比的 |
 | **four-ligand convention**（SAM / OQO / FAD / IAI） | 四个分子，**无固定清单** | 各家自选 AF2 / AF3 / Chai-1 / RF3，无统一流程 | **无统一指标**，各家自选 | **widely reused convention**：用得最多但数字不可横比 |
 | [**DISCO / Studio-179**](https://arxiv.org/abs/2604.05181) | Studio-179：170 个配体 + 9 个多配体组合 | Chai-1 折叠 + AF3 / ESMFold + PoseBusters | 骨架 RMSD、配体质心 RMSD、PoseBusters 合法性 | 规模最大，但尚无第三方复用 |
-这一类的门槛是模型得看得懂配体。AME 有固定题面和明确判据，所以跨论文能比；four-ligand 只是大家默认用同几个分子，各家验证器都不一样，数字**没法**横比。这一类的前置条件是配体条件化，不是接口对不上的问题。
+
+该类任务的前提是模型可读取配体。AME 题面固定、判据明确，具备跨论文可比性；four-ligand 仅是共同测试分子的惯例，样本数与验证器由各家自定，**数字不可横比**。
 
 ### peptide
 
@@ -54,7 +57,8 @@
 |---|---|---|---|---|
 | [**PepGLAD / PepBench**](https://github.com/THUNLP-MT/PepGLAD) | 固定划分：PepBDB 划分随仓库，LNR 在 Zenodo；任务是天然肽–受体复合物**重建** | 无结构预测器，直接对晶体肽比 + PyRosetta | Cα RMSD、AAR、Rosetta ΔG | **fixed split + 有真值肽**，可直接量全原子差异 |
 | **RFpeptides** | 4 个靶点的自有面板，**大环肽** de novo | 环状 AF2（AfCycDesign）+ Rosetta；湿实验 | iPAE、Cα RMSD、Rosetta interface metrics | 大环 de novo + **wet-lab** |
-这一类实际是两件事。PepGLAD 是重建天然复合物，有真值肽，可以直接量全原子差多少——这是 binder 线给不了的证据，代价是它测的是"能否复现已知答案"。RFpeptides 是大环从头设计，前置条件是环状拓扑表示，属于另一种能力。
+
+该类包含两种性质不同的任务。PepGLAD 属天然复合物重建，具真值肽，可直接量化全原子偏差——这是 binder 类基准无法提供的证据，代价是其评估对象为复现已知结构的能力；RFpeptides 为大环 de novo 设计，前提是环状拓扑表示。
 
 ### antibody / nanobody
 
@@ -63,7 +67,8 @@
 | [**RAbD**](https://github.com/THUNLP-MT/dyMEAN) | 60 个案例（ML 圈常用筛后 55）；给定 framework 的 CDR 重设计 | Rosetta 打分，直接对天然结构；只排名不设阈值 | Rosetta 能量、序列恢复率（AAR） | **事实标准案例集**，这一类复用最广 |
 | [**CHIMERA-Bench**](https://arxiv.org/abs/2603.13431) | 自建 2,922 个复合物，3 种互不相交划分；表位条件下的 CDR 共设计 | 对天然结构直接打分；11 个方法同设置重训 | AAR、CAAR、Cα RMSD、TM-score、Fnat、iRMSD、DockQ、表位 F1 | **leaderboard + 同设置基线**，可比性最强 |
 | **AIntibody**（Nat Biotechnol） | 29 家机构、511 条 AI 设计抗体的盲测题面 | 真做实验（含 KinExA） | 实测结合亲和力 | **前瞻性盲测 wet-lab**，非可下载数据集 |
-**本轮核实的主流 benchmark 以 framework-conditioned CDR redesign 为主**——framework 给定，只改 CDR。RAbD 是大家都在用的那批案例，CHIMERA 自建了更大的集合还带排行榜，AIntibody 是真做实验的盲测挑战。这一类的前置条件是能在残基级固定 framework 并只放开 CDR；另外抗体与纳米抗体不共用协议，纳米抗体没有轻链，流程结构本身就不同。
+
+**本轮核实的主流 benchmark 以 framework-conditioned CDR redesign 为主**——framework 给定，仅 CDR 开放。RAbD 为该类的事实标准案例集；CHIMERA-Bench 自建更大规模集合，并提供排行榜与同设置重训基线；AIntibody 为前瞻性盲测挑战。抗体与纳米抗体不共用协议：纳米抗体无轻链，挖空档位与流程结构均不同。
 
 ---
 

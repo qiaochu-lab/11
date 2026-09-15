@@ -28,8 +28,18 @@
 | [**A-CODE**](https://arxiv.org/abs/2605.03360) | arXiv 2026 | 同一 10-target panel | AF2-IG，单一判定档 | pLDDT、ipTM、ipAE、bound-unbound RMSD | 全原子一步 co-design；单验证器单档 |
 | [**ProtDBench**](https://github.com/congliuUvA/ProtDBench) | **ICML 2026** | 同一 panel + Cao 靶点；另带 Cao 湿实验打分表 | 同一批设计并行喂给 AF2-IG / ColabFold / Protenix(-Mini) / Boltz / Chai-1 / ESMFold，多档并判；TMalign 聚类 | 上述全部 + unscaled ipAE；簇级成功率 | **multi-verifier**：换验证器与换档的影响可直接读出来 |
 | [**BindCraft**](https://github.com/martinpacesa/BindCraft) | **Nature 2025** | **自有 panel**，不用上面那十个靶点 | AF2-multimer 设计环 → AF2 单体重预测；湿实验 | pLDDT、ipTM、ipAE、bound-unbound RMSD | 自成一套 panel + wet-lab |
+| [**BenchBB**](https://www.adaptyvbio.com/blog/benchbb) | community paper（[bioRxiv 2025](https://www.biorxiv.org/content/10.1101/2025.04.17.648362)） | **7 个标准化靶点**：EGFR、IL-7Rα、PD-L1、BBF-14、BHRF1、MBP、Cas9 | **自带统一湿实验协议**：BLI / SPR 测 k_on、k_off 换算 K_D | K_D（k_on / k_off） | 少数自带标准化湿实验协议的靶点集；**已有独立使用**（TriFlow、Boolean VHH 竞赛与 BoltzGen 用 MBP），但**无公开排行榜**，发表成熟度低于同行评审 venue |
 
-该类任务的产物形态与全原子 co-design 最为接近。**AlphaProteo、PXDesign、A-CODE、ProtDBench 共用 AlphaProteo 的 10-target panel；BindCraft 使用自有 panel。** ProtDBench 不提出新方法，而是将同一批设计并行提交给多个验证器与多个判定档，因此是唯一可直接读出 verifier 选择与档位影响的条目。
+该类任务的产物形态与全原子 co-design 最为接近。**AlphaProteo、PXDesign、A-CODE、ProtDBench 共用 AlphaProteo 的 10-target panel；BindCraft 使用自有 panel。** ProtDBench 不提出新方法，而是将同一批设计并行提交给多个验证器与多个判定档，因此是唯一可直接读出 verifier 选择与档位影响的条目。BenchBB 的不同之处在于它自带统一湿实验协议，代价是尚无公开排行榜、发表成熟度较低。
+
+### monomer / unconditional
+
+| Work | Publication / Venue | Test set / setting | Evaluation pipeline | Core metrics | Key point |
+|---|---|---|---|---|---|
+| [**ProteinBench**](https://arxiv.org/abs/2409.06744) | **ICLR 2025** | 七类任务的 holistic 套件，含无条件单体分支 | 多维评估（quality / novelty / diversity / robustness），配公开 leaderboard | scRMSD、scTM、pLDDT、TM-score | 覆盖面最广的一体化套件，且**有公开榜** |
+| [**Scaffold-Lab**](https://github.com/Immortals-33/Scaffold-Lab) | **PLOS Comput Biol 2026** | 无条件生成重评 7 个方法；motif 分支沿用 RFdiffusion 的 24 题 | ProteinMPNN → ESMFold，Top-N 取最优 | sc-TM、sc-RMSD、pdb-TM（novelty）、Foldseek 聚类（diversity）、MolProbity、运行时 | 把既有方法放进**同一框架统一重评并排名**，含效率与结构合规性 |
+
+这一类的判据是"不给条件也能生成可折叠的东西"。ProteinBench 面向多任务、带公开榜；Scaffold-Lab 的价值在于统一重评——各家原本用各自的长度、样本数与 Top-N 策略自报，横比本来就不成立。两者都把 novelty 与 diversity 当独立维度报，而不是只报单一成功率。
 
 ### motif scaffolding
 
@@ -38,8 +48,9 @@
 | [**MotifBench**](https://arxiv.org/abs/2502.12479) | arXiv / whitepaper 2025 | 30 题固定题面 | ProteinMPNN → ESMFold → Kabsch 对齐；Foldseek 查唯一解 | motif RMSD、scRMSD；唯一成功解计数、novelty | **fixed benchmark**，有独立维护方与排行榜 |
 | [**RFdiffusion motif 集**](https://github.com/RosettaCommons/RFdiffusion) | **Nature 2023** | 25 题，这一类的原始题面 | ProteinMPNN → AF2 | motif RMSD、scRMSD | **widely reused**：后续题面多由它派生 |
 | [**La-Proteina**](https://github.com/NVIDIA-BioNeMo/la-proteina) | **ICLR 2026** | 26 个全原子 motif 任务（含侧链原子） | 模型自产序列 → 全原子自洽比对 | 全原子 RMSD（含侧链）、motif RMSD | **all-atom**：侧链也算进判据 |
+| [**GeomMotif**](https://openreview.net/forum?id=b4C3zAzRgH) | **ICLR 2026** | **57 个任务**，每题 1–2 个 motif、最多 7 段连续片段；自 PDB 采样并保证存在可解构象 | 与模态无关（序列式与结构式方法同台）；几何保真 + 聚类 | scRMSD、pLDDT、**SUN**（Successful / Unique / Novel 合成分） | 把**纯几何保持**从功能约束中剥离，与 function-focused 的 MotifBench **互补而非重复** |
 
-前两者判定骨架层面的自洽性，即重折序列与目标骨架的偏差；La-Proteina 将侧链原子纳入判据，是**本轮核实候选中最直接评估 all-atom co-designability 的代表工作**。三者题面部分重叠但判据层级不同，成功率不可直接比较。
+前两者判定骨架层面的自洽性，即重折序列与目标骨架的偏差；La-Proteina 将侧链原子纳入判据，是**本轮核实候选中最直接评估 all-atom co-designability 的代表工作**。GeomMotif 则把几何保持与功能约束拆开，题面由 PDB 采样并保证存在可解构象。四者题面部分重叠但判据层级不同，成功率不可直接比较。
 
 ### enzyme / ligand
 
@@ -51,24 +62,27 @@
 
 该类任务的前提是模型可读取配体。AME 题面固定、判据明确，具备跨论文可比性；four-ligand 仅是共同测试分子的惯例，样本数与验证器由各家自定，**数字不可横比**。
 
+**几何 / proxy 指标与真实活性不是同一层证据。** 上表判的都是几何与位姿——催化重原子摆得对不对、配体容不容得下。[Riff-Diff](https://www.nature.com/articles/s41586-025-09747-9)（**Nature 2026**，649(8095):237–245）用 retro-aldol 与 Morita–Baylis–Hillman 两个反应做实测，速率加速超过 5×10⁶ 倍，说明几何过关之后仍有巨大的活性差异空间；[COMPSS](https://github.com/seanrjohnson/protein_scoring)（**Nat Biotechnol 2025**）反过来拿实测活性校准 20 个 in-silico 指标，最好的也只到中等区分度。**所以酶线的几何成功率不能当作活性预测来引用。**
+
 ### peptide
 
 | Work | Publication / Venue | Test set / setting | Evaluation pipeline | Core metrics | Key point |
 |---|---|---|---|---|---|
 | [**PepGLAD / PepBench**](https://github.com/THUNLP-MT/PepGLAD) | **NeurIPS 2024** | 固定划分：PepBDB 划分随仓库，LNR 在 Zenodo；任务是天然肽–受体复合物**重建** | 无结构预测器，直接对晶体肽比 + PyRosetta | Cα RMSD、AAR、Rosetta ΔG | **fixed split + 有真值肽**，可直接量全原子差异 |
 | **RFpeptides** | **Nature Chem Biol 2025** | 4 个靶点的自有面板，**大环肽** de novo | 环状 AF2（AfCycDesign）+ Rosetta；湿实验 | iPAE、Cα RMSD、Rosetta interface metrics | 大环 de novo + **wet-lab** |
+| [**BOND-PEP**](https://advanced.onlinelibrary.wiley.com/doi/10.1002/advs.77125) | **Advanced Science 2026** | **193 对非同源 held-out** 蛋白–肽；**仅序列**的线性 binder 设定 | AlphaFold-Multimer 共折叠，取末五次输出中最高 ipTM | ipTM（**reference-beating success@8**） | 判据是**相对天然肽**而非绝对阈值——换个参照就换个结论 |
 
-该类包含两种性质不同的任务。PepGLAD 属天然复合物重建，具真值肽，可直接量化全原子偏差——这是 binder 类基准无法提供的证据，代价是其评估对象为复现已知结构的能力；RFpeptides 为大环 de novo 设计，前提是环状拓扑表示。
+该类包含三种性质不同的任务。PepGLAD 属天然复合物重建，具真值肽，可直接量化全原子偏差——这是 binder 类基准无法提供的证据，代价是其评估对象为复现已知结构的能力；RFpeptides 为大环 de novo 设计，前提是环状拓扑表示；BOND-PEP 只输出序列、不评价结构，且成功与否以能否超过天然肽的 ipTM 为准。
 
 ### antibody / nanobody
 
 | Work | Publication / Venue | Test set / setting | Evaluation pipeline | Core metrics | Key point |
 |---|---|---|---|---|---|
 | [**RAbD**](https://github.com/THUNLP-MT/dyMEAN) | **PLOS Comput Biol 2018** | 60 个案例（ML 圈常用筛后 55）；给定 framework 的 CDR 重设计 | Rosetta 打分，直接对天然结构；只排名不设阈值 | Rosetta 能量、序列恢复率（AAR） | **事实标准案例集**，这一类复用最广 |
-| [**CHIMERA-Bench**](https://arxiv.org/abs/2603.13431) | **GEM @ ICLR 2026** | 自建 2,922 个复合物，3 种互不相交划分；表位条件下的 CDR 共设计 | 对天然结构直接打分；11 个方法同设置重训 | AAR、CAAR、Cα RMSD、TM-score、Fnat、iRMSD、DockQ、表位 F1 | **leaderboard + 同设置基线**，可比性最强 |
+| [**抗体 / VHH 逆折叠基准**](https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0324566) | **PLOS ONE 2025** | **203 Fab + 61 VHH**；CDR 序列设计（逆折叠） | 无结构预测器，直接对天然序列比；另用 Boltz-1 重折 | 序列恢复率、BLOSUM62 相似度、关键残基准确率 | 公开代码与数据，且**把 Fab 与 VHH 分开报**——少数覆盖纳米抗体的 |
 | **AIntibody** | **Nature Biotechnology 2026** | 29 家机构、511 条 AI 设计抗体的盲测题面 | 真做实验（含 KinExA） | 实测结合亲和力 | **前瞻性盲测 wet-lab**，非可下载数据集 |
 
-**本轮核实的主流 benchmark 以 framework-conditioned CDR redesign 为主**——framework 给定，仅 CDR 开放。RAbD 为该类的事实标准案例集；CHIMERA-Bench 自建更大规模集合，并提供排行榜与同设置重训基线；AIntibody 为前瞻性盲测挑战。抗体与纳米抗体不共用协议：纳米抗体无轻链，挖空档位与流程结构均不同。
+**本轮核实的主流 benchmark 以 framework-conditioned CDR redesign 为主**——framework 给定，仅 CDR 开放。RAbD 为该类的事实标准案例集；PLOS ONE 的逆折叠基准公开代码与数据，且把 Fab 与 VHH 分开报，是少数覆盖纳米抗体的；AIntibody 为前瞻性盲测挑战。抗体与纳米抗体不共用协议：纳米抗体无轻链，挖空档位与流程结构均不同。
 
 ---
 

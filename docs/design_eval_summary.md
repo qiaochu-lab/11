@@ -160,7 +160,7 @@
 | **A02** | dyMEAN 三任务 | **无结构预测验证器**，直接对天然结构 | AAR、CAAR、Cα RMSD、TM-score、lDDT、DockQ | **无，只排名** | 有 | 无 | 无 | — | **`indep ×多`**——三任务协议被后续 co-design 论文大量沿用 |
 | **A03** | DiffAb 19 | Rosetta | **IMP% = 设计 CDR 结合能优于原生的比例**，即 ΔΔG<0 | 绝对 | 有 | 无 | 无 | — | `indep ×1+` |
 | **A04** | ProteinBench 抗体分支 | **IgFold**（H+L 同时输入，真实非 H3 结构作模板）→ Kabsch → **抗原存在下 Rosetta relax 5×200 步取最低能量** | 13 个指标分四组；**噪声下限已给出：IgFold 对天然结构 relax 后 1.77 Å** | 绝对 | 有 | ✅ HF 榜 | 无 | — | `indep ×1+` |
-| **A05** | CHIMERA-Bench | 无结构预测器，对天然结构 | `aar,caar,ppl` / `rmsd,tm_score` / `fnat,irmsd,dockq` / `epitope_f1` / `n_liabilities` / `chimera_s`,`chimera_b`。**两套接触定义**：标注与 CAAR 用 4.5 Å 重原子，界面指标用 8.0 Å Cα–Cα | **无，mean±std 排名** | **11 个方法同设置重训** | **✅ 排行榜随仓库**：135 条数据行（11 方法 × 3 划分 × 6 CDR） | 无 | — | `UNRESOLVED`（2026 新出） |
+| **A05** | CHIMERA-Bench | 无结构预测器，对天然结构 | `aar,caar,ppl` / `rmsd,tm_score` / `fnat,irmsd,dockq` / `epitope_f1` / `n_liabilities` / `chimera_s`,`chimera_b`。**两套接触定义**：标注与 CAAR 用 4.5 Å 重原子，界面指标用 8.0 Å Cα–Cα | **无，mean±std 排名** | **11 个方法同设置重训** | **✅ 排行榜随仓库**：135 条数据行（11 方法 × 3 划分 × 6 CDR） | 无 | — | **截至 2026-09-16 未找到独立论文复用**（本轮已检索；其 11 个基线系作者自行同设置重训，不计第三方复用）。**已从汇报版主表移出，仅保留在本 inventory。** |
 | **A06** | IgGM SAb-23H2-Ab | — | 结构预测成功率 **DockQ > 0.23**；CDR-H3 设计报骨架 RMSD + AAR（36%） | 绝对 | 有 | 无 | 无 | — | `UNRESOLVED` |
 | **A07** | CDR 逆折叠（Fab） | Boltz-1 重折 | 序列恢复率、BLOSUM62、关键残基准确率、对 ΔΔG 的 Spearman | **无** | **有**：AntiFold 0.703、LM-Design 0.597、ESM-IF 0.423、ProteinMPNN 0.349 | 无 | 无 | — | `UNRESOLVED` |
 | **A08** | AbBiBench | — | **模型对完整复合物的对数似然 vs 实测亲和力的 Spearman**：ProteinMPNN 0.30、ESM-IF1 0.28、AntiFold 0.21（**纯序列语言模型接近零甚至为负**） | 校准 | 有 | 无 | **强**：>184,500 条测量 | — | `UNRESOLVED` |

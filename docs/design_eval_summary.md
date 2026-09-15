@@ -70,7 +70,7 @@
 | **B13** | binder | **BindEnergyCraft** | — | 预印本 2025 | `PROTOCOL` | 8 靶点 | 靶点结构 | binder 序列 + 结构 | §3.1 |
 | **B14** | binder | **Proteína-Complexa** | NVIDIA | 预印本 2026 | `PROTOCOL` | 19（12 easy + 7 hard）+ 4 小分子 + 41 AME | 靶点结构 / 配体 | 复合物 | §3.1 |
 | **M01** | monomer | **MotifBench** | 社区（多组共建） | arXiv / whitepaper 2025 | `FIXED` 随仓库 | **30 题** × 100 骨架 × 8 序列 | motif 残基坐标 | 支架骨架 + 序列 | §13.1 |
-| **M02** | monomer | **RFdiffusion motif 集** | Baker lab | **期刊** Nature 2023 | `FIXED*` | 25 题 | motif 坐标 | 骨架 | §3.2 |
+| **M02** | monomer | **RFdiffusion motif 集** | Baker lab | Nature 2023 | `FIXED*` | 25 题 | motif 坐标 | 骨架 | §3.2 |
 | **M03** | monomer | **Genie2 motif 变体** | — | 预印本 2024 | `FIXED*` | 24（去掉 6VW1） | motif 坐标 | 骨架 | §3.2 |
 | **M04** | monomer | **无条件生成的约定俗成协议**（FrameFlow / FoldFlow 系） | 无单一提出方 | — | `CONVENTION` | 长度 100/150/200/250/300 | **无条件** | 骨架（+ MPNN 序列） | §13.5 |
 | **M05** | monomer | **ProteinBench** | — | 预印本 2024 | `FIXED` HF 榜 | 七类任务；抗体 55 / CAMEO2022 183 / apo-holo 91 / ATLAS 82 | 按任务不同 | 按任务不同 | §3.2 |

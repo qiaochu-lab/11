@@ -85,11 +85,7 @@ tbody tr:nth-child(even){background:var(--zebra)}
 </tbody></table></div>
 <p><strong>本轮核实的主流 benchmark 以 framework-conditioned CDR redesign 为主</strong>——framework 给定，仅 CDR 开放。RAbD 为该类的事实标准案例集；CHIMERA-Bench 自建更大规模集合，并提供排行榜与同设置重训基线；AIntibody 为前瞻性盲测挑战。抗体与纳米抗体不共用协议：纳米抗体无轻链，挖空档位与流程结构均不同。</p>
 <hr>
-<h2>三、五条 survey findings</h2>
-<p><strong>1. fixed benchmark ≠ widely reused convention。</strong> 复用最广的往往不是最标准化的。酶线的 four-ligand 用得最多，却没有清单、各家验证器不同，数字没法横比；AME 反过来，题面固定判据明确，复用面窄一些但能跨论文比。</p>
-<p><strong>2. wet-lab strong ≠ reproducible benchmark。</strong> 湿实验强和能复跑经常是两回事。实验最硬的那几项（商业模型、盲测挑战）恰恰拿不到可复跑的 artifacts，而 artifacts 最规范的几个又没有湿实验。所以"这个 benchmark 可信吗"得拆成两个问题分别问。</p>
-<p><strong>3. shared panel ≠ shared ecosystem。</strong> AlphaProteo 提供被复用的 10-target panel；PXDesign / A-CODE / ProtDBench 之间作者和生态重叠，因此<strong>后三者不能视为完全独立的外部验证，但 direct baseline comparability 很高</strong>。要补外部独立证据，需要独立团队或独立实验 / 标签源；换 verifier family 可以检验 robustness，但本身不等于 independent validation。</p>
-<p><strong>4. 换 verifier 会显著改变 success rate。</strong> 在 ProtDBench 的 Cao wet-lab calibration set 上，AF2-IG 的 ipAE 在 8 个 verifier 中排第 6。同一批设计换一个判定档，有的靶点成功率差两个数量级，有的几乎不动。所以 verifier choice 本身会显著影响 benchmark conclusion——报成功率必须说清用的是哪个验证器、哪一档。</p>
-<p><strong>5. 不同 task 的 conditioning requirement 不同。</strong> 六类任务要求的条件化输入完全不是一回事：binder 和 motif 给的是结构坐标，peptide 重建给受体，enzyme 要能读配体或 EC 号，antibody 要能在残基级固定 framework 再只放开 CDR，大环肽还要环状拓扑表示。所以"支持条件生成"不是一个开关——判断一个模型能上哪些 benchmark，得按 conditioning 的类型逐个看。</p>
+<h2>三、小结与建议</h2>
+<p>调研结果与 Proteo-AA 的核心主张之间存在一处明确错位：现有题面绝大多数判定的是<strong>骨架层面</strong>的自洽性，真正将侧链纳入判据的只有 all-atom co-designability 一类协议（本轮核实候选中以 La-Proteina 为代表），而这恰是全原子 co-design 唯一测得到的部分。据此，在权重与算力均在协作方、本地只能确定题面与打分口径的现状下，建议的做法是：<strong>以 binder 线作为出数主线</strong>——AlphaProteo 的 10-target panel 已复现为可运行配置，Protenix 本就是依赖，边际成本最低，且与 PXDesign / A-CODE 同坐标系，数字可直接对齐；<strong>在同一批设计上并行跑多档与多验证器</strong>，这既是对齐 baseline，也是对 verifier 选择的稳健性检查（同一批设计换一个判定档，个别靶点成功率可相差两个数量级，故任何成功率都须注明验证器与档位）；<strong>另补一条 all-atom co-designability 评估</strong>，用以支撑全原子这一差异点，因为 binder 线的判据测不到它。enzyme、antibody 与大环肽建议暂不纳入：其缺口不是评估侧的接口适配，而是模型侧的条件化能力（配体读取、framework 残基级固定加 CDR mask、环状拓扑表示）。最后一点需要说明，<strong>外部独立性只能由独立团队或独立实验 / 标签源提供</strong>；换 verifier family 可检验稳健性，但不构成 independent validation。</p>
 <hr>
 <p class='fine'>完整 inventory、逐条源码核对与 unresolved 清单见 <code>design_eval_summary.md</code> 与 <code>design_eval_landscape.md</code>。</p></div></body></html>

@@ -59,18 +59,18 @@
 | **B02** | binder | **ProtDBench** | 构建于 `bytedance/PXDesignBench` | **ICML 2026** | `FIXED` 随仓库 | 同 B01 十靶点 + 5 个 Cao 靶点；22,720 条设计 | 同 B01 | 同 B01 | §9.1 |
 | **B03** | binder | **A-CODE** | PXDesign 同生态 | 预印本 2026 | `PROTOCOL`（靶点同 B01，采样协议自己的） | 10 靶点，每靶点 328–728 条 | 同 B01 | binder 序列 + 结构（两个 variant） | §9.1 |
 | **B04** | binder | **PXDesign / PXDesignBench** | ByteDance | 预印本 2025 | `FIXED` 随仓库 | 10 蛋白 + 12 环肽 | 同 B01 | binder 序列 + 结构 | §9.1 |
-| **B05** | binder | **BindCraft** | — | Nature 2025 | `PROTOCOL` | **12 靶点**（v1 预印本 10） | 靶点结构 + hotspot | binder 序列 + 结构 | §9.2 |
+| **B05** | binder | **BindCraft** | — | **Nature 2025** | `PROTOCOL` | **12 靶点**（v1 预印本 10） | 靶点结构 + hotspot | binder 序列 + 结构 | §9.2 |
 | **B06** | binder | **BoltzGen** | — | 预印本 2025 | `PROTOCOL` | 10 低同源新靶点 + 5 简单；湿实验共 26 靶点 | 靶点结构 | binder 序列 + 结构 | §9.3 |
-| **B07** | binder | **RFdiffusion binder 面板** | Baker lab | Nature 2023 | `PROTOCOL` | 5 靶点 | 靶点结构 + hotspot | 骨架（序列走 ProteinMPNN） | §9.4 |
+| **B07** | binder | **RFdiffusion binder 面板** | Baker lab | **Nature 2023** | `PROTOCOL` | 5 靶点 | 靶点结构 + hotspot | 骨架（序列走 ProteinMPNN） | §9.4 |
 | **B08** | binder | **Latent-X** | 商业（Latent Labs） | 预印本 2025 | `PROTOCOL` | 7 湿实验靶点 + 200 结构 in-silico 集 | 靶点结构 | binder 序列 + 全原子结构 | §9.5 |
 | **B09** | binder | **ODesign** | — | 预印本 2025 | `PROTOCOL` | 10 或 11（`UNRESOLVED`） | 靶点结构，只给靶点 MSA | binder 序列 + 结构 | §9.6 |
-| **B10** | binder | **Cao et al. 2022 面板** | IPD | Nature 2022 | `FIXED*` 六个 tar.gz | **12 蛋白 / 13 位点**，每位点 1.5 万–10 万条 | 靶点结构 | 设计 + 酵母展示标签 | §9.7 |
+| **B10** | binder | **Cao et al. 2022 面板** | IPD | **Nature 2022** | `FIXED*` 六个 tar.gz | **12 蛋白 / 13 位点**，每位点 1.5 万–10 万条 | 靶点结构 | 设计 + 酵母展示标签 | §9.7 |
 | **B11** | binder | **Adaptyv EGFR 竞赛**（两轮） | Adaptyv Bio | 预印本 2025 | `FIXED` 随仓库 | 1 靶点；R1 201 / R2 402 条已表征 | 靶点结构 | 设计 + BLI K_D 标签 | §9.8 |
 | **B12** | binder | **BoltzDesign1** | — | 预印本 2025 | `PROTOCOL` | `UNRESOLVED` | 靶点结构 | binder 序列 + 结构 | §9.9 |
 | **B13** | binder | **BindEnergyCraft** | — | 预印本 2025 | `PROTOCOL` | 8 靶点 | 靶点结构 | binder 序列 + 结构 | §3.1 |
 | **B14** | binder | **Proteína-Complexa** | NVIDIA | 预印本 2026 | `PROTOCOL` | 19（12 easy + 7 hard）+ 4 小分子 + 41 AME | 靶点结构 / 配体 | 复合物 | §3.1 |
 | **M01** | monomer | **MotifBench** | 社区（多组共建） | arXiv / whitepaper 2025 | `FIXED` 随仓库 | **30 题** × 100 骨架 × 8 序列 | motif 残基坐标 | 支架骨架 + 序列 | §13.1 |
-| **M02** | monomer | **RFdiffusion motif 集** | Baker lab | Nature 2023 | `FIXED*` | 25 题 | motif 坐标 | 骨架 | §3.2 |
+| **M02** | monomer | **RFdiffusion motif 集** | Baker lab | **Nature 2023** | `FIXED*` | 25 题 | motif 坐标 | 骨架 | §3.2 |
 | **M03** | monomer | **Genie2 motif 变体** | — | 预印本 2024 | `FIXED*` | 24（去掉 6VW1） | motif 坐标 | 骨架 | §3.2 |
 | **M04** | monomer | **无条件生成的约定俗成协议**（FrameFlow / FoldFlow 系） | 无单一提出方 | — | `CONVENTION` | 长度 100/150/200/250/300 | **无条件** | 骨架（+ MPNN 序列） | §13.5 |
 | **M05** | monomer | **ProteinBench** | — | 预印本 2024 | `FIXED` HF 榜 | 七类任务；抗体 55 / CAMEO2022 183 / apo-holo 91 / ATLAS 82 | 按任务不同 | 按任务不同 | §3.2 |
@@ -87,7 +87,7 @@
 | **E05** | enzyme | **EnzyBench（EnzyGen）** | — | 预印本 2024 | `FIXED*` 仅 Google Drive | 3157 个四级 EC 家族，1500 测试 | EC 号 / 功能 | 酶序列 + 结构 | §15.4 |
 | **E06** | enzyme | **EnzyBind（EnzyControl）** | — | 预印本 2025 | `FIXED*` Zenodo 1.34 GB | 11,100 对酶–底物 | 底物 + 功能 | 酶序列 + 结构 | §15.4 |
 | **E07** | enzyme | **CrossDocked / Binding MOAD 口袋重设计** | PocketGen / PocketFlow（同作者） | 预印本 2024 | `FIXED*` 靠脚本重生成 | 各 100 对 | 配体 + 口袋外骨架 | 口袋序列 + 侧链 | §15.5 |
-| **E08** | enzyme | **COMPSS** | — | Nat Biotechnol 2025 | `FIXED*` Zenodo，**README 链接全坏** | 2 个酶家族，500+ 条表达纯化（144 条活性） | — | **不产设计**，校准打分器 | §15.6 |
+| **E08** | enzyme | **COMPSS** | — | **Nat Biotechnol 2025** | `FIXED*` Zenodo，**README 链接全坏** | 2 个酶家族，500+ 条表达纯化（144 条活性） | — | **不产设计**，校准打分器 | §15.6 |
 | **A01** | antibody | **RAbD** | Rosetta 社区 | **PLOS Comput Biol 2018** | `FIXED` 事实标准，清单两处机器可读 | **60**（ML 圈常用筛后 55） | 天然复合物 + 完整 framework | CDR 序列（+ 结构） | §16.2 |
 | **A02** | antibody | **dyMEAN 三任务协议** | THUNLP-MT | 未核实 2023 | `FIXED` `configs.py` 三清单 | CDR-H3 设计 **60** / 结构预测 **70** / 亲和力 **53** | 复合物，**framework 完全给定** | CDR-H3 序列 + 结构 | §16.2 |
 | **A03** | antibody | **DiffAb 19 复合物** | — | 未核实 | `FIXED*` **仓库不带清单**，按抗原名过滤重建 | 19 | 复合物，framework 给定 | CDR 序列 + 结构 | §16.2 |
@@ -111,7 +111,7 @@
 | **X02** | 横切 | **Overath 元分析** | — | 2025 | 标签数据 | 3,766 条实测 binder / 15 靶点 | — | 打分器 AP 对比（**ipSAE > ipAE，1.4×**） | §6 |
 | **X03** | 横切 | **Rocklin 组零样本回测** | — | 2025 | 标签数据 | **614 个实测单体** / 11 项研究 | — | 指标区分成败的能力 | §6 |
 | **X04** | 横切 | **ipSAE** | Dunbrack lab | 2025 | 指标 | — | pAE 矩阵 | 替代 ipTM 的界面分 | §6 |
-| **X05** | 横切 | **Korbeld refolding 局限** | — | Protein Science 2026 | 结论 | — | — | 自洽指标被进化信息污染 | §6 |
+| **X05** | 横切 | **Korbeld refolding 局限** | — | **Protein Science 2026** | 结论 | — | — | 自洽指标被进化信息污染 | §6 |
 | **X06** | 横切 | **Protein FID** | — | 2025/26 | 指标 | — | — | 是否覆盖训练分布 | §6 |
 | **X07** | 横切 | **Domain Retrieval Rate** | — | 2026 | 指标 | — | — | 新颖性被高估 | §6 |
 
@@ -276,7 +276,7 @@
 | **B13** | BindEnergyCraft | — | 预印本 | ⚠️ | ❌ 未放出 | ❌ | ❌ | **低** |
 | **B14** | Proteína-Complexa | NVIDIA | 预印本 2026 | ⚠️ | ⚠️ 承诺放出 | — | ❌ | **低中** |
 | **M01** | **MotifBench** | **社区共建 + 独立维护** | arXiv / whitepaper 2025 | ❌ | ✅ 题面随仓库 | ✅ | ✅ 题面 + 榜都在 | **高**——这一类**唯一有独立维护方和榜的** |
-| **M02** | RFdiffusion motif | Baker lab | ✅ Nature | ✅ | ✅ | ✅ | ⚠️ | **中高** |
+| **M02** | RFdiffusion motif | Baker lab | ✅ **Nature** | ✅ | ✅ | ✅ | ⚠️ | **中高** |
 | **M03** | Genie2 变体 | — | 预印本 | ❌ | ⚠️ | ⚠️ | ⚠️ | **中** |
 | **M04** | 无条件生成协议 | **无提出方，是惯例** | — | ❌ | — 无需数据 | ✅ 人人在用 | ❌ **各家实现不统一，数字不严格可比** | **中**（普及度高、标准化低） |
 | **M05** | ProteinBench | — | 预印本 2024 | ❌ | ✅ HF 榜 | ⚠️ | ⚠️ | **中高** |
@@ -298,7 +298,7 @@
 | **A02** | dyMEAN 三任务 | 学术组 | 未核实 2023 | ❌ | ✅ 三清单在 `configs.py` | ✅ 协议被大量沿用 | ⚠️ **论文 51 vs 代码 70**，两个数都真实 | **高** |
 | **A03** | DiffAb 19 | — | 未核实 | ❌ | ⚠️ **清单要重建** | ✅ | ⚠️ 已重建并列出 | **中** |
 | **A04** | ProteinBench 抗体分支 | — | 预印本 2024 | ❌ | ⚠️ = RAbD 减 5 | ✅ | ✅ **给出了噪声下限 1.77 Å**（少见的好做法） | **中高** |
-| **A05** | **CHIMERA-Bench** | — | ⚠️ **GEM @ ICLR 2026** | ❌ | ✅ **splits JSON 最规范** + 榜随仓库 | ⚠️ 太新 | ⚠️ 榜可读，全量未下载 | **中高**——**榜 + 11 个同设置重训基线** |
+| **A05** | **CHIMERA-Bench** | — | ⚠**️ GEM @ ICLR 2026** | ❌ | ✅ **splits JSON 最规范** + 榜随仓库 | ⚠️ 太新 | ⚠️ 榜可读，全量未下载 | **中高**——**榜 + 11 个同设置重训基线** |
 | **A06** | IgGM Ab | — | 未核实 | ❌ | ✅ Zenodo，含预挖空 FASTA | ⚠️ | ✅ 60 条可直接数出 | **中高** |
 | **A07** | CDR 逆折叠 Fab | — | 未核实 | ⚠️ 借 ΔΔG | ✅ CSV 随仓库 | ⚠️ | ✅ 203 行可直接数出 | **中高** |
 | **A08** | AbBiBench | — | 预印本 2025 | ✅✅ >184,500 条 | ⚠️ | ⚠️ | ⚠️ | **中高** |

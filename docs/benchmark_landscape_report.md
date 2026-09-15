@@ -4,16 +4,14 @@
 
 ## 一、六类 task landscape
 
-| 类别 | 考什么能力 | 输入 → 输出 | evaluation paradigm | 代表工作 | interface |
+| 类别 | 考什么能力 | 输入 → 输出 | evaluation paradigm | 代表工作 | core metrics |
 |---|---|---|---|---|---|
-| **binder / miniprotein** | 给定靶点与表位，能否造出结合物 | 靶点结构 + hotspot → binder 序列 + 复合物坐标 | refolding / self-consistency（AF2-IG、Protenix、Boltz、Chai-1） | [AlphaProteo](https://arxiv.org/abs/2409.08022)、[ProtDBench](https://github.com/congliuUvA/ProtDBench)、[BindCraft](https://github.com/martinpacesa/BindCraft) | **Direct** |
-| **monomer / unconditional** | 无条件生成可折叠单体 | 只给长度 → 骨架（+ 序列） | refolding / self-consistency（ProteinMPNN → ESMFold） | [ProteinBench](https://arxiv.org/abs/2409.06744)、FrameFlow / FoldFlow 系惯例 | **Direct** |
-| **motif scaffolding** | 给定功能位点，能否长出支撑它的支架 | motif 坐标 → 支架骨架 + 序列 | refolding / self-consistency + 唯一性聚类 | [MotifBench](https://arxiv.org/abs/2502.12479)、[La-Proteina](https://github.com/NVIDIA-BioNeMo/la-proteina) | **Adapter** |
-| **peptide** | 小尺度 target-conditioned 设计；环化拓扑 | 受体结构 → 肽序列 + 结构 | native-structure comparison（对晶体肽）；大环另用环状预测器 | [PepGLAD](https://github.com/THUNLP-MT/PepGLAD)、RFpeptides | **Adapter**（大环 Future） |
-| **enzyme / ligand** | 配体或底物条件下造催化环境 | 配体 + 催化残基（或 EC 号）→ 酶骨架 + 序列 | refolding + 配体位姿合法性；部分用实测活性校准 | [AME](https://github.com/RosettaCommons/RFdiffusion2)、[DISCO](https://arxiv.org/abs/2604.05181) | **Future** |
-| **antibody / nanobody** | 给定 framework 改 CDR | 天然复合物 + 完整 framework + 抗原 → CDR 序列 + 结构 | native-structure comparison（AAR、DockQ）；少数用实验标签 | [RAbD](https://github.com/THUNLP-MT/dyMEAN)、[CHIMERA](https://arxiv.org/abs/2603.13431) | **Future** |
-
-小字：图例 — Direct / Adapter / Future 仅表示当前接口距离，不代表优先级。
+| **binder / miniprotein** | 给定靶点与表位，能否造出结合物 | 靶点结构 + hotspot → binder 序列 + 复合物坐标 | refolding / self-consistency（AF2-IG、Protenix、Boltz、Chai-1） | [AlphaProteo](https://arxiv.org/abs/2409.08022)、[ProtDBench](https://github.com/congliuUvA/ProtDBench)、[BindCraft](https://github.com/martinpacesa/BindCraft) | pLDDT、ipTM、ipAE、bound-unbound RMSD；簇级成功率 |
+| **monomer / unconditional** | 无条件生成可折叠单体 | 只给长度 → 骨架（+ 序列） | refolding / self-consistency（ProteinMPNN → ESMFold） | [ProteinBench](https://arxiv.org/abs/2409.06744)、FrameFlow / FoldFlow 系惯例 | scRMSD、pLDDT；多样性、新颖性 |
+| **motif scaffolding** | 给定功能位点，能否长出支撑它的支架 | motif 坐标 → 支架骨架 + 序列 | refolding / self-consistency + 唯一性聚类 | [MotifBench](https://arxiv.org/abs/2502.12479)、[La-Proteina](https://github.com/NVIDIA-BioNeMo/la-proteina) | motif RMSD、scRMSD；唯一解计数 |
+| **peptide** | 小尺度 target-conditioned 设计；环化拓扑 | 受体结构 → 肽序列 + 结构 | native-structure comparison（对晶体肽）；大环另用环状预测器 | [PepGLAD](https://github.com/THUNLP-MT/PepGLAD)、RFpeptides | Cα RMSD、AAR、Rosetta ΔG |
+| **enzyme / ligand** | 配体或底物条件下造催化环境 | 配体 + 催化残基（或 EC 号）→ 酶骨架 + 序列 | refolding + 配体位姿合法性；部分用实测活性校准 | [AME](https://github.com/RosettaCommons/RFdiffusion2)、[DISCO](https://arxiv.org/abs/2604.05181) | 催化重原子 RMSD、配体 RMSD、PoseBusters 合法性 |
+| **antibody / nanobody** | 给定 framework 改 CDR | 天然复合物 + 完整 framework + 抗原 → CDR 序列 + 结构 | native-structure comparison（AAR、DockQ）；少数用实验标签 | [RAbD](https://github.com/THUNLP-MT/dyMEAN)、[CHIMERA](https://arxiv.org/abs/2603.13431) | AAR、CAAR、Cα RMSD、DockQ、表位 F1 |
 
 > **不同 task family 用的是不同的 evaluation paradigm**——refolding / self-consistency、native-structure comparison、experimental labels 各自成体系。**不能默认它们共用同一套 verifier**，也不能把跨 paradigm 的成功率拿来横比。
 
@@ -23,54 +21,54 @@
 
 ### binder / miniprotein
 
-| Work | 类型 | 在考什么 | 怎么评 | interface |
+| Work | 类型 | 在考什么 | 怎么评 | core metrics |
 |---|---|---|---|---|
-| [**AlphaProteo**](https://arxiv.org/abs/2409.08022) | method + 靶点规格 | 提出了被后续复用的 10-target panel | AF2 类重折；有湿实验 | Direct |
-| [**PXDesign**](https://github.com/bytedance/PXDesignBench) | method + evaluation framework | 该 panel 上的设计与打分流程 | AF2-IG、Protenix | Direct |
-| [**A-CODE**](https://arxiv.org/abs/2605.03360) | method | 全原子一步 co-design | AF2-IG 单一档 | Direct |
-| [**ProtDBench**](https://github.com/congliuUvA/ProtDBench) | **evaluation framework** | 同一批设计同时按多档、多验证器打分 | AF2-IG / ColabFold / Protenix / Boltz / Chai-1 / ESMFold | Direct |
-| [**BindCraft**](https://github.com/martinpacesa/BindCraft) | method | 幻觉式 binder 设计，**使用自己的 panel** | AF2-multimer 设计 + 单体重预测；有湿实验 | Adapter |
+| [**AlphaProteo**](https://arxiv.org/abs/2409.08022) | method + 靶点规格 | 提出了被后续复用的 10-target panel | AF2 类重折；有湿实验 | pLDDT、ipTM、ipAE、bound-unbound RMSD |
+| [**PXDesign**](https://github.com/bytedance/PXDesignBench) | method + evaluation framework | 该 panel 上的设计与打分流程 | AF2-IG、Protenix | pLDDT、ipAE、binder RMSD；iptm_binder、ptm_binder |
+| [**A-CODE**](https://arxiv.org/abs/2605.03360) | method | 全原子一步 co-design | AF2-IG 单一档 | pLDDT、ipTM、ipAE、bound-unbound RMSD |
+| [**ProtDBench**](https://github.com/congliuUvA/ProtDBench) | **evaluation framework** | 同一批设计同时按多档、多验证器打分 | AF2-IG / ColabFold / Protenix / Boltz / Chai-1 / ESMFold | 上述全部 + unscaled ipAE；簇级成功率（TMalign） |
+| [**BindCraft**](https://github.com/martinpacesa/BindCraft) | method | 幻觉式 binder 设计，**使用自己的 panel** | AF2-multimer 设计 + 单体重预测；有湿实验 | pLDDT、ipTM、ipAE、bound-unbound RMSD |
 
 这一类问的就是"给定靶点能不能造出结合物"，产物形态和我们在做的事最接近。**只有 AlphaProteo、PXDesign、A-CODE、ProtDBench 共用 AlphaProteo 那个 10-target panel；BindCraft 不用这十个靶点，有自己的一套。** ProtDBench 特殊的地方是它不出新方法，而是把同一批设计同时交给多个验证器打分，所以它是我们最容易对齐的参照。
 
 ### motif scaffolding
 
-| Work | 类型 | 在考什么 | 怎么评 | interface |
+| Work | 类型 | 在考什么 | 怎么评 | core metrics |
 |---|---|---|---|---|
-| [**MotifBench**](https://arxiv.org/abs/2502.12479) | **benchmark** | 固定题面上的 motif 支架能力 | ProteinMPNN → ESMFold；Foldseek 查唯一解 | Adapter |
-| [**RFdiffusion motif 集**](https://github.com/RosettaCommons/RFdiffusion) | protocol | 这一类的原始题面，被后续直接继承 | ProteinMPNN + AF2 | Adapter |
-| [**La-Proteina**](https://github.com/NVIDIA-BioNeMo/la-proteina) | protocol | **全原子** motif（含侧链原子） | all-atom co-designability | Adapter |
+| [**MotifBench**](https://arxiv.org/abs/2502.12479) | **benchmark** | 固定题面上的 motif 支架能力 | ProteinMPNN → ESMFold；Foldseek 查唯一解 | motif RMSD、scRMSD；唯一成功解计数、novelty |
+| [**RFdiffusion motif 集**](https://github.com/RosettaCommons/RFdiffusion) | protocol | 这一类的原始题面，被后续直接继承 | ProteinMPNN + AF2 | motif RMSD、scRMSD |
+| [**La-Proteina**](https://github.com/NVIDIA-BioNeMo/la-proteina) | protocol | **全原子** motif（含侧链原子） | all-atom co-designability | 全原子 RMSD（含侧链）、motif RMSD |
 
 这一类问的是"给一个功能位点，能不能长出撑住它的支架"。前两个判的是骨架自洽——序列重折回来像不像；La-Proteina 把侧链原子也算进去，是**本轮核实候选中最直接评估 all-atom co-designability 的代表工作**。对我们的意义就在这个差别上：前两者测不到全原子那一部分。
 
 ### enzyme / ligand
 
-| Work | 类型 | 在考什么 | 怎么评 | interface |
+| Work | 类型 | 在考什么 | 怎么评 | core metrics |
 |---|---|---|---|---|
-| [**AME**](https://github.com/RosettaCommons/RFdiffusion2) | **benchmark** | 催化位点支架：能否摆对催化残基并容纳配体 | LigandMPNN → Chai-1；催化重原子 RMSD + 配体撞车 | Future |
-| **four-ligand convention**（SAM / OQO / FAD / IAI） | **convention**，非 benchmark | 配体条件生成，事实上的共同测试分子 | 各家验证器与样本数都不同 | Future |
-| [**DISCO / Studio-179**](https://arxiv.org/abs/2604.05181) | benchmark | 大规模配体条件生成 | Chai-1 + 配体位姿合法性检查 | Future |
+| [**AME**](https://github.com/RosettaCommons/RFdiffusion2) | **benchmark** | 催化位点支架：能否摆对催化残基并容纳配体 | LigandMPNN → Chai-1 | 催化重原子 RMSD、配体撞车检查 |
+| **four-ligand convention**（SAM / OQO / FAD / IAI） | **convention**，非 benchmark | 配体条件生成，事实上的共同测试分子 | 各家验证器与样本数都不同 | **无统一指标**，各家自选 |
+| [**DISCO / Studio-179**](https://arxiv.org/abs/2604.05181) | benchmark | 大规模配体条件生成 | Chai-1 + 配体位姿合法性检查 | 骨架 RMSD、配体质心 RMSD、PoseBusters 合法性 |
 
-这一类的门槛是模型得看得懂配体。AME 有固定题面和明确判据，所以跨论文能比；four-ligand 只是大家默认用同几个分子，各家验证器都不一样，数字**没法**横比。对我们全是 Future，而且卡的不是接口不顺，是还没有配体条件化这个能力。
+这一类的门槛是模型得看得懂配体。AME 有固定题面和明确判据，所以跨论文能比；four-ligand 只是大家默认用同几个分子，各家验证器都不一样，数字**没法**横比。这一类的前置条件是配体条件化，不是接口对不上的问题。
 
 ### peptide
 
-| Work | 类型 | 在考什么 | 怎么评 | interface |
+| Work | 类型 | 在考什么 | 怎么评 | core metrics |
 |---|---|---|---|---|
-| [**PepGLAD / PepBench**](https://github.com/THUNLP-MT/PepGLAD) | benchmark（固定划分） | 天然肽–受体复合物的**重建** | 无结构预测器，直接对晶体肽比 | Adapter |
-| **RFpeptides** | protocol | **大环肽** de novo 设计 | 环状 AF2 + Rosetta；有湿实验 | Future |
+| [**PepGLAD / PepBench**](https://github.com/THUNLP-MT/PepGLAD) | benchmark（固定划分） | 天然肽–受体复合物的**重建** | 无结构预测器，直接对晶体肽比 | Cα RMSD、AAR、Rosetta ΔG |
+| **RFpeptides** | protocol | **大环肽** de novo 设计 | 环状 AF2（AfCycDesign）+ Rosetta；有湿实验 | AfCycDesign 置信度、Rosetta 界面能量 |
 
-这一类实际是两件事。PepGLAD 是重建天然复合物，有真值肽，可以直接量全原子差多少——这是 binder 线给不了的证据，代价是它测的是"能否复现已知答案"。RFpeptides 是大环从头设计，需要环状位置编码，属于另一种能力。
+这一类实际是两件事。PepGLAD 是重建天然复合物，有真值肽，可以直接量全原子差多少——这是 binder 线给不了的证据，代价是它测的是"能否复现已知答案"。RFpeptides 是大环从头设计，前置条件是环状拓扑表示，属于另一种能力。
 
 ### antibody / nanobody
 
-| Work | 类型 | 在考什么 | 怎么评 | interface |
+| Work | 类型 | 在考什么 | 怎么评 | core metrics |
 |---|---|---|---|---|
-| [**RAbD**](https://github.com/THUNLP-MT/dyMEAN) | **事实标准案例集** | 给定 framework 的 CDR 重设计 | Rosetta 能量、序列恢复率；只排名 | Future |
-| [**CHIMERA-Bench**](https://arxiv.org/abs/2603.13431) | **benchmark + leaderboard** | 表位条件下的 CDR 序列–结构共设计 | 对天然结构：AAR、DockQ、表位 F1 | Future |
-| **AIntibody**（Nat Biotechnol） | **社区盲测挑战** | 多机构 AI 设计抗体的前瞻性对比 | 真做实验 | — |
+| [**RAbD**](https://github.com/THUNLP-MT/dyMEAN) | **事实标准案例集** | 给定 framework 的 CDR 重设计 | Rosetta 打分；只排名不设阈值 | Rosetta 能量、序列恢复率（AAR） |
+| [**CHIMERA-Bench**](https://arxiv.org/abs/2603.13431) | **benchmark + leaderboard** | 表位条件下的 CDR 序列–结构共设计 | 对天然结构直接打分 | AAR、CAAR、Cα RMSD、TM-score、Fnat、iRMSD、DockQ、表位 F1 |
+| **AIntibody**（Nat Biotechnol） | **社区盲测挑战** | 多机构 AI 设计抗体的前瞻性对比 | 真做实验 | 实测结合亲和力 |
 
-**本轮核实的主流 benchmark 以 framework-conditioned CDR redesign 为主**——framework 给定，只改 CDR。RAbD 是大家都在用的那批案例，CHIMERA 自建了更大的集合还带排行榜，AIntibody 是真做实验的盲测挑战。对我们是 Future，缺的是 framework 残基级固定和 CDR mask；另外抗体与纳米抗体不共用协议，纳米抗体没有轻链，流程结构本身就不同。
+**本轮核实的主流 benchmark 以 framework-conditioned CDR redesign 为主**——framework 给定，只改 CDR。RAbD 是大家都在用的那批案例，CHIMERA 自建了更大的集合还带排行榜，AIntibody 是真做实验的盲测挑战。这一类的前置条件是能在残基级固定 framework 并只放开 CDR；另外抗体与纳米抗体不共用协议，纳米抗体没有轻链，流程结构本身就不同。
 
 ---
 
@@ -88,8 +86,8 @@ AlphaProteo 提供被复用的 10-target panel；PXDesign / A-CODE / ProtDBench 
 **4. 换 verifier 会显著改变 success rate。**
 常用的 AF2-IG verifier 放在八个打分器里只排第 6。同一批设计换一个判定档，有的靶点成功率差两个数量级，有的几乎不动。所以报成功率必须说清用的是哪个验证器、哪一档。
 
-**5. 三类接口距离，缺口各不相同。**
-binder 和无条件单体是 Direct，motif 和线性肽是 Adapter，enzyme / antibody / 大环是 Future。但 Future 里缺的不是同一样东西——配体条件化、framework 残基级固定加 CDR mask、环状位置编码是三件事，归成一句"缺条件化"会掩盖真实工作量。
+**5. 不同 task 的 conditioning requirement 不同。**
+六类任务要求的条件化输入完全不是一回事：binder 和 motif 给的是结构坐标，peptide 重建给受体，enzyme 要能读配体或 EC 号，antibody 要能在残基级固定 framework 再只放开 CDR，大环肽还要环状拓扑表示。所以"支持条件生成"不是一个开关——判断一个模型能上哪些 benchmark，得按 conditioning 的类型逐个看。
 
 ---
 

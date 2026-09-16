@@ -6,12 +6,12 @@
 
 | 类别 | 考什么能力 | 输入 → 输出 | evaluation paradigm | 代表工作 | core metrics |
 |---|---|---|---|---|---|
-| **binder / miniprotein** | 给定靶点与表位，能否造出结合物 | 靶点结构 + hotspot → binder 序列 + 复合物坐标 | refolding / self-consistency（AF2-IG、Protenix、Boltz、Chai-1） | [AlphaProteo](https://arxiv.org/abs/2409.08022)、[ProtDBench](https://github.com/congliuUvA/ProtDBench)、[BindCraft](https://github.com/martinpacesa/BindCraft) | pLDDT、ipTM、ipAE、bound-unbound RMSD（后续标准化的 filter set）；簇级成功率 |
-| **monomer / unconditional** | 无条件生成可折叠单体 | 只给长度 → 骨架（+ 序列） | refolding / self-consistency（ProteinMPNN → ESMFold） | [ProteinBench](https://arxiv.org/abs/2409.06744)、FrameFlow / FoldFlow 系惯例 | scRMSD、pLDDT；多样性、新颖性 |
-| **motif scaffolding** | 给定功能位点，能否长出支撑它的支架 | motif 坐标 → 支架骨架 + 序列 | refolding / self-consistency + 唯一性聚类 | [MotifBench](https://arxiv.org/abs/2502.12479)、[La-Proteina](https://github.com/NVIDIA-BioNeMo/la-proteina) | motif RMSD、scRMSD；唯一解计数 |
-| **peptide** | 小尺度 target-conditioned 设计；环化拓扑 | 受体结构 → 肽序列 + 结构 | native-structure comparison（对晶体肽）；大环另用环状预测器 | [PepGLAD](https://github.com/THUNLP-MT/PepGLAD)、RFpeptides | Cα RMSD、AAR、Rosetta ΔG |
-| **enzyme / ligand** | 配体或底物条件下造催化环境 | 配体 + 催化残基（或 EC 号）→ 酶骨架 + 序列 | refolding + 配体位姿合法性；部分用实测活性校准 | [AME](https://github.com/RosettaCommons/RFdiffusion2)、[DISCO](https://arxiv.org/abs/2604.05181) | 催化重原子 RMSD、配体 RMSD、PoseBusters 合法性 |
-| **antibody / nanobody** | 给定 framework 改 CDR | 天然复合物 + 完整 framework + 抗原 → CDR 序列 + 结构 | native-structure comparison（AAR、DockQ）；少数用实验标签 | [RAbD](https://github.com/THUNLP-MT/dyMEAN)、[抗体/VHH 逆折叠基准](https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0324566) | AAR、CAAR、Cα RMSD、DockQ、表位 F1 |
+| **binder / miniprotein** | 给定靶点与表位，能否造出结合物 | 靶点结构 + hotspot → binder 序列 + 复合物坐标 | refolding / self-consistency（AF2-IG、Protenix、Boltz、Chai-1） | [AlphaProteo](https://arxiv.org/abs/2409.08022)、[ProtDBench](https://github.com/congliuUvA/ProtDBench)、[BenchBB](https://www.adaptyvbio.com/blog/benchbb) | pLDDT、ipTM、ipAE、bound-unbound RMSD（后续标准化的 filter set）；簇级成功率 |
+| **monomer / unconditional** | 无条件生成可折叠单体 | 只给长度 → 骨架（+ 序列） | refolding / self-consistency（ProteinMPNN → ESMFold） | [ProteinBench](https://arxiv.org/abs/2409.06744)、[Scaffold-Lab](https://github.com/Immortals-33/Scaffold-Lab) | scRMSD、pLDDT；多样性、新颖性 |
+| **motif scaffolding** | 给定功能位点，能否长出支撑它的支架 | motif 坐标 → 支架骨架 + 序列 | refolding / self-consistency + 唯一性聚类 | [MotifBench](https://arxiv.org/abs/2502.12479)、[GeomMotif](https://openreview.net/forum?id=b4C3zAzRgH)、[La-Proteina](https://github.com/NVIDIA-BioNeMo/la-proteina) | motif RMSD、scRMSD；唯一解计数 |
+| **peptide** | 小尺度 target-conditioned 设计；环化拓扑 | 受体结构 → 肽序列 + 结构 | native-structure comparison（对晶体肽）；大环另用环状预测器 | [PepGLAD](https://github.com/THUNLP-MT/PepGLAD)、[BOND-PEP](https://advanced.onlinelibrary.wiley.com/doi/10.1002/advs.77125)、RFpeptides | Cα RMSD、AAR、Rosetta ΔG |
+| **enzyme / ligand** | 配体或底物条件下造催化环境 | 配体 + 催化残基（或 EC 号）→ 酶骨架 + 序列 | refolding + 配体位姿合法性；部分用实测活性校准 | [AME](https://github.com/RosettaCommons/RFdiffusion2)、four-ligand convention、[DISCO](https://arxiv.org/abs/2604.05181) | 催化重原子 RMSD、配体 RMSD、PoseBusters 合法性 |
+| **antibody / nanobody** | 给定 framework 改 CDR | 天然复合物 + 完整 framework + 抗原 → CDR 序列 + 结构 | native-structure comparison（AAR、DockQ）；少数用实验标签 | [RAbD](https://github.com/THUNLP-MT/dyMEAN)、[Fab–VHH 逆折叠基准](https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0324566)、AIntibody | AAR、CAAR、Cα RMSD、DockQ、表位 F1 |
 
 > **不同 task family 用的是不同的 evaluation paradigm**——refolding / self-consistency、native-structure comparison、experimental labels 各自成体系。**不能默认它们共用同一套 verifier**，也不能把跨 paradigm 的成功率拿来横比。
 
@@ -52,6 +52,16 @@
 
 前两者判定骨架层面的自洽性，即重折序列与目标骨架的偏差；La-Proteina 将侧链原子纳入判据，是**本轮核实候选中最直接评估 all-atom co-designability 的代表工作**。GeomMotif 则把几何保持与功能约束拆开，题面由 PDB 采样并保证存在可解构象。四者题面部分重叠但判据层级不同，成功率不可直接比较。
 
+### peptide
+
+| Work | Publication / Venue | Test set / setting | Evaluation pipeline | Core metrics | Key point |
+|---|---|---|---|---|---|
+| [**PepGLAD / PepBench**](https://github.com/THUNLP-MT/PepGLAD) | **NeurIPS 2024** | 固定划分：PepBDB 划分随仓库，LNR 在 Zenodo；任务是天然肽–受体复合物**重建** | 无结构预测器，直接对晶体肽比 + PyRosetta | Cα RMSD、AAR、Rosetta ΔG | **fixed split + 有真值肽**，可直接量全原子差异 |
+| **RFpeptides** | **Nature Chem Biol 2025** | 4 个靶点的自有面板，**大环肽** de novo | 环状 AF2（AfCycDesign）+ Rosetta；湿实验 | iPAE、Cα RMSD、Rosetta interface metrics | 大环 de novo + **wet-lab** |
+| [**BOND-PEP**](https://advanced.onlinelibrary.wiley.com/doi/10.1002/advs.77125) | **Advanced Science 2026** | **193 对非同源 held-out** 蛋白–肽；**仅序列**的线性 binder 设定 | AlphaFold-Multimer 共折叠，取末五次输出中最高 ipTM | ipTM（**reference-beating success@8**） | 判据是**相对天然肽**而非绝对阈值——换个参照就换个结论 |
+
+该类包含三种性质不同的任务。PepGLAD 属天然复合物重建，具真值肽，可直接量化全原子偏差——这是 binder 类基准无法提供的证据，代价是其评估对象为复现已知结构的能力；RFpeptides 为大环 de novo 设计，前提是环状拓扑表示；BOND-PEP 只输出序列、不评价结构，且成功与否以能否超过天然肽的 ipTM 为准。
+
 ### enzyme / ligand
 
 | Work | Publication / Venue | Test set / setting | Evaluation pipeline | Core metrics | Key point |
@@ -63,16 +73,6 @@
 该类任务的前提是模型可读取配体。AME 题面固定、判据明确，具备跨论文可比性；four-ligand 仅是共同测试分子的惯例，样本数与验证器由各家自定，**数字不可横比**。
 
 **几何 / proxy 指标与真实活性不是同一层证据。** 上表判的都是几何与位姿——催化重原子摆得对不对、配体容不容得下。[Riff-Diff](https://www.nature.com/articles/s41586-025-09747-9)（**Nature 2026**，649(8095):237–245）用 retro-aldol 与 Morita–Baylis–Hillman 两个反应做实测，速率加速超过 5×10⁶ 倍，说明几何过关之后仍有巨大的活性差异空间；[COMPSS](https://github.com/seanrjohnson/protein_scoring)（**Nat Biotechnol 2025**）反过来拿实测活性校准 20 个 in-silico 指标，最好的也只到中等区分度。**所以酶线的几何成功率不能当作活性预测来引用。**
-
-### peptide
-
-| Work | Publication / Venue | Test set / setting | Evaluation pipeline | Core metrics | Key point |
-|---|---|---|---|---|---|
-| [**PepGLAD / PepBench**](https://github.com/THUNLP-MT/PepGLAD) | **NeurIPS 2024** | 固定划分：PepBDB 划分随仓库，LNR 在 Zenodo；任务是天然肽–受体复合物**重建** | 无结构预测器，直接对晶体肽比 + PyRosetta | Cα RMSD、AAR、Rosetta ΔG | **fixed split + 有真值肽**，可直接量全原子差异 |
-| **RFpeptides** | **Nature Chem Biol 2025** | 4 个靶点的自有面板，**大环肽** de novo | 环状 AF2（AfCycDesign）+ Rosetta；湿实验 | iPAE、Cα RMSD、Rosetta interface metrics | 大环 de novo + **wet-lab** |
-| [**BOND-PEP**](https://advanced.onlinelibrary.wiley.com/doi/10.1002/advs.77125) | **Advanced Science 2026** | **193 对非同源 held-out** 蛋白–肽；**仅序列**的线性 binder 设定 | AlphaFold-Multimer 共折叠，取末五次输出中最高 ipTM | ipTM（**reference-beating success@8**） | 判据是**相对天然肽**而非绝对阈值——换个参照就换个结论 |
-
-该类包含三种性质不同的任务。PepGLAD 属天然复合物重建，具真值肽，可直接量化全原子偏差——这是 binder 类基准无法提供的证据，代价是其评估对象为复现已知结构的能力；RFpeptides 为大环 de novo 设计，前提是环状拓扑表示；BOND-PEP 只输出序列、不评价结构，且成功与否以能否超过天然肽的 ipTM 为准。
 
 ### antibody / nanobody
 
@@ -86,9 +86,23 @@
 
 ---
 
+### 横切：Scorer / verifier calibration resources
+
+下面四项**不是设计 benchmark**，不产生新设计，因此不列进上面任何一张 family 表。它们回答的是另一个问题：**这些 in-silico 指标到底能不能预测实验结果**——与第三部分第 2、3 条直接对应。
+
+| Resource | 内容 |
+|---|---|
+| **Cao 2022** | binder 湿实验标签：13 个位点、每位点万级设计，带酵母展示结果 |
+| **Adaptyv EGFR** | 601 条经 BLI 表征的设计（两轮竞赛） |
+| **Overath** | 3,766 条实测 binder 的元分析（15 个靶点） |
+| **Rocklin** | 614 个实测单体设计（跨 11 项研究） |
+
+---
+
 ## 三、小结
 
-**1. Protein design 没有一套通用 benchmark。** 不同任务实际在测不同东西：binder / monomer / motif 常依赖 refolding 与 self-consistency；有天然参考答案的 peptide / antibody benchmark 可以直接做 sequence / structure recovery；enzyme / ligand-conditioned design 还需要评价 catalytic geometry、ligand pose，并可能最终依赖实验活性。All-atom co-designability 是其中一个评价维度，而不是统一总指标。
+**1. Protein design 没有一套通用 benchmark。**
+评价证据大致分三层：refolding / self-consistency、native-reference comparison、experimental validation。不同 task 会**组合**这些证据，而不是一类任务固定对应一种 evaluator。All-atom co-designability 是其中一个维度，而不是统一总指标。
 
 **2. 同一个 test set 也不代表结果可以直接横比。** Sampling protocol、sequence-design route、verifier、metric 和 threshold 都会改变最终 success rate。尤其 verifier 或 filter setting 改变时，同一批设计的结论都可能明显变化，因此引用 success rate 时必须同时说明评价协议。
 
